@@ -7,18 +7,35 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-file(GLOB_RECURSE LIB_SOURCES CONFIGURE_DEPENDS src/*.cpp)
-list(FILTER LIB_SOURCES EXCLUDE REGEX "src/main\\.cpp$")
+option(STDAN_BUILD_TESTS "Build stdan test targets" OFF)
 
-if(NOT LIB_SOURCES)
-    set(STDAN_DUMMY_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/stdan_dummy.cpp")
-    file(WRITE "${STDAN_DUMMY_SOURCE}" "// Dummy translation unit for static library build.\n")
-    list(APPEND LIB_SOURCES "${STDAN_DUMMY_SOURCE}")
+file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+list(FILTER STDAN_SOURCES EXCLUDE REGEX "src/main\\.cpp$")
+
+if(STDAN_SOURCES)
+    add_library(stdan STATIC ${STDAN_SOURCES})
+    target_include_directories(stdan PUBLIC include)
+    target_compile_definitions(stdan PUBLIC
+        $<$<CONFIG:Debug>:STDAN_DEBUG=1>
+        $<$<NOT:$<CONFIG:Debug>>:STDAN_DEBUG=0>
+    )
+else()
+    add_library(stdan INTERFACE)
+    target_include_directories(stdan INTERFACE include)
+    target_compile_definitions(stdan INTERFACE
+        $<$<CONFIG:Debug>:STDAN_DEBUG=1>
+        $<$<NOT:$<CONFIG:Debug>>:STDAN_DEBUG=0>
+    )
+
+    # Keep compile_commands.json useful for editors in header-only mode.
+    set(STDAN_TOOLING_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PopSwapVector.cpp")
+    file(WRITE "${STDAN_TOOLING_SOURCE}" [[#include "PopSwapVector.hpp"
+]])
+    add_library(stdan_tooling OBJECT EXCLUDE_FROM_ALL "${STDAN_TOOLING_SOURCE}")
+    target_link_libraries(stdan_tooling PRIVATE stdan)
 endif()
 
-add_library(stdan STATIC ${LIB_SOURCES})
-target_include_directories(stdan PUBLIC include)
-target_compile_definitions(stdan PUBLIC
-    $<$<CONFIG:Debug>:DAN_DEBUG=1>
-    $<$<NOT:$<CONFIG:Debug>>:DAN_DEBUG=0>
-)
+if(STDAN_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
