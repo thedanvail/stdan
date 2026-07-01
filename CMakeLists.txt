@@ -28,8 +28,8 @@ else()
     )
 
     # Keep compile_commands.json useful for editors in header-only mode.
-    set(STDAN_TOOLING_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/PopSwapVector.cpp")
-    file(WRITE "${STDAN_TOOLING_SOURCE}" [[#include "PopSwapVector.hpp"
+    set(STDAN_TOOLING_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/ps_vector.cpp")
+    file(WRITE "${STDAN_TOOLING_SOURCE}" [[#include "storage/ps_vector.hpp"
 ]])
     add_library(stdan_tooling OBJECT EXCLUDE_FROM_ALL "${STDAN_TOOLING_SOURCE}")
     target_link_libraries(stdan_tooling PRIVATE stdan)
