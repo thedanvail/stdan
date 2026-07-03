@@ -39,7 +39,8 @@ fmt: format
 
 # --- compile_commands.json shortcut ---
 
-cc: configure
+cc:
+	$(MAKE) configure STDAN_BUILD_TESTS=ON
 	@echo "compile_commands.json symlinked to project root"
 
 # --- Clean ---
