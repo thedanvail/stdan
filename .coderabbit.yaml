@@ -5,4 +5,4 @@ reviews:
   # Enable formal GitHub PR approvals/request changes
   request_changes_workflow: true
   high_level_summary: true
-  poisy_threshold: 0.2
+

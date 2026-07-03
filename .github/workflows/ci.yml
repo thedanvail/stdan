@@ -4,6 +4,13 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -12,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          persist-credentials: false
 
       - name: Install Tools
         run: |
@@ -20,13 +28,15 @@ jobs:
 
       - name: Generate Compile Commands
         run: make cc
-      
+
       - name: Run Clang-Tidy
       # clang-tidy automatically looks for compile_commands.json in parent directories
         run: |
-          find . -name "*.cpp" -o -name "*.h" | xargs clang-tidy -p . --warnings-as-errors=* -extra-arg=-std=c++23
+          find src include -name "*.cpp" -o -name "*.h" | xargs clang-tidy -p . --warnings-as-errors=* -extra-arg=-std=c++23
 
-      - name: Run Cppcheck
-        # Fails the build if any errors are found
+
+       - name: Run Cppcheck
+       # Fails the build if any errors are found
         run: |
-          cppcheck --enable=all --error-exitcode=1 .
+          cppcheck --enable=all --error-exitcode=1 -i vendor -i build src include
+
