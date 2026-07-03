@@ -94,6 +94,11 @@ namespace stdan::memory
             return std::unexpected(arena_alloc_error::WouldOverflow);
         }
 
+        if(aligned_offset > p_arena->reserved_size)
+        {
+            return std::unexpected(arena_alloc_error::WouldUnderflow);
+        }
+
         if(size > p_arena->reserved_size - aligned_offset)
         { 
             return std::unexpected(arena_alloc_error::WouldUnderflow);

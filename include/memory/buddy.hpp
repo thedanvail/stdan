@@ -35,9 +35,21 @@ namespace stdan::memory
             mark_recursive(get_right_child(aIndex), aValue);
         }
 
+        void clear_subtree(std::size_t aIndex)
+        {
+            if (aIndex >= NumNodes) { return; }
+
+            m_tree.set(aIndex, false);
+            clear_subtree(get_left_child(aIndex));
+            clear_subtree(get_right_child(aIndex));
+        }
+
         void unmark_recursive(std::size_t aIndex)
         {
-            m_tree.set(aIndex, false);
+            if (aIndex >= NumNodes) { return; }
+
+            clear_subtree(aIndex);
+
             if(aIndex == 0) { return; }
 
             std::size_t parent = get_parent(aIndex);

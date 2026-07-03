@@ -35,6 +35,5 @@ target_compile_definitions(stdan PUBLIC
 
 if(STDAN_BUILD_TESTS)
     enable_testing()
+    add_subdirectory(tests)
 endif()
-
-add_subdirectory(tests)

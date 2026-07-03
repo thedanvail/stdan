@@ -41,8 +41,8 @@ namespace stdan::memory
     [[nodiscard]] inline std::expected<T*, arena_alloc_error> arena_construct(arena* a, Args&&... args)
     {
         auto raw = arena_alloc(a, sizeof(T), alignof(T));
-        if(!raw) { return raw.error(); }
-        return ::new (raw) T(std::forward<Args>(args)...);
+        if(!raw) { return std::unexpected(raw.error()); }
+        return ::new (*raw) T(std::forward<Args>(args)...);
     }
 }
 
