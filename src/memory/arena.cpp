@@ -2,6 +2,7 @@
 #include "memory_base.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <expected>
 
@@ -34,17 +35,18 @@ namespace stdan::memory
 #else
         munmap(p_arena->base_ptr, p_arena->reserved_size);
 #endif
-        free(p_arena);
+        std::free(p_arena);
     }
 
     [[nodiscard]] std::expected<arena*, arena_alloc_error> create_arena(std::size_t reserve_size)
     {
         if(reserve_size == 0) { return std::unexpected(arena_alloc_error::ZeroSize); }
         arena* ret = static_cast<arena*>(std::malloc(sizeof(arena)));
-        if(ret == nullptr) { return std::unexpected(arena_alloc_error::MallocFailed); }
+        if(ret == nullptr) { return std::unexpected(arena_alloc_error::CouldNotReserveMemory); }
         
         // TODO: check for reserve size overflow
         reserve_size = (reserve_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+        if(reserve_size > (SIZE_MAX - (PAGE_SIZE - 1))) { return std::unexpected(arena_alloc_error::ReserveSizeOverflow); }
 #ifdef _WIN32
         void* block = VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
         if(block == nullptr)
@@ -64,7 +66,7 @@ namespace stdan::memory
         if(block == MAP_FAILED)
         {
             std::free(ret);
-            return std::unexpected(arena_alloc_error::MallocFailed);
+            return std::unexpected(arena_alloc_error::CouldNotReserveMemory);
         }
 #endif
         ret->base_ptr = static_cast<std::byte*>(block);
@@ -91,17 +93,17 @@ namespace stdan::memory
         // overflow/underflow checks
         if(aligned_offset < p_arena->current_offset)
         { 
-            return std::unexpected(arena_alloc_error::WouldOverflow);
+            return std::unexpected(arena_alloc_error::OffsetOverflow);
         }
 
         if(aligned_offset > p_arena->reserved_size)
         {
-            return std::unexpected(arena_alloc_error::WouldUnderflow);
+            return std::unexpected(arena_alloc_error::NotEnoughMemory);
         }
 
         if(size > p_arena->reserved_size - aligned_offset)
         { 
-            return std::unexpected(arena_alloc_error::WouldUnderflow);
+            return std::unexpected(arena_alloc_error::NotEnoughMemory);
         }
 
         std::size_t new_offset = aligned_offset + size;
@@ -110,10 +112,8 @@ namespace stdan::memory
         {
             // Align the required commit size up to the nearest page
             std::size_t new_commit_target = (new_offset + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-            // Clamp to the reservation limit
-            if(new_commit_target > p_arena->reserved_size) { new_commit_target = p_arena->reserved_size; }
-            std::size_t size_to_commit = new_commit_target -   p_arena->committed_size;
-            std::byte* commit_start_addr = p_arena->base_ptr + p_arena->committed_size;
+            std::size_t size_to_commit    = new_commit_target - p_arena->committed_size;
+            std::byte* commit_start_addr  = p_arena->base_ptr + p_arena->committed_size;
 
 #ifdef _WIN32
             if(!VirtualAlloc(commit_start_addr, size_to_commit, MEM_COMMIT, PAGE_READWRITE))

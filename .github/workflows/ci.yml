@@ -30,13 +30,10 @@ jobs:
         run: make cc
 
       - name: Run Clang-Tidy
-      # clang-tidy automatically looks for compile_commands.json in parent directories
         run: |
-          find src include -name "*.cpp" -o -name "*.h" | xargs clang-tidy -p . --warnings-as-errors=* -extra-arg=-std=c++23
+          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) -print | xargs clang-tidy -p . --warnings-as-errors=* -extra-arg=-std=c++23
 
-
-       - name: Run Cppcheck
-       # Fails the build if any errors are found
+      - name: Run Cppcheck
         run: |
           cppcheck --enable=all --error-exitcode=1 -i vendor -i build src include
 

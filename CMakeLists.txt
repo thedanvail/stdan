@@ -25,8 +25,7 @@ endforeach()
 list(REMOVE_DUPLICATES STDAN_HEADER_DIRS)
 
 add_library(stdan STATIC ${STDAN_SOURCES})
-target_include_directories(stdan PUBLIC include)
-target_include_directories(stdan PRIVATE ${STDAN_HEADER_DIRS})
+target_include_directories(stdan PUBLIC include ${STDAN_HEADER_DIRS})
 target_sources(stdan PRIVATE ${STDAN_HEADERS})
 target_compile_definitions(stdan PUBLIC
     $<$<CONFIG:Debug>:STDAN_DEBUG=1>

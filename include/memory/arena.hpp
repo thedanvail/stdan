@@ -22,18 +22,20 @@ namespace stdan::memory
 
     enum class arena_alloc_error
     {
-        MallocFailed,
         NullPointerArenaArg,
         ZeroSize,
         BadAlignment,
-        WouldOverflow,
-        WouldUnderflow,
-        CouldNotCommitMemory
+        NotEnoughMemory,
+        OffsetOverflow,
+        CouldNotCommitMemory,
+        CouldNotReserveMemory,
+        ReserveSizeOverflow
     };
 
 
     [[nodiscard]] std::expected<arena*,     arena_alloc_error> create_arena(std::size_t reserve_size);
     [[nodiscard]] std::expected<std::byte*, arena_alloc_error> arena_alloc(arena* p_arena, std::size_t size, std::size_t alignment = alignof(std::max_align_t));
+    /// Resets the offset pointer. Note that it does NOT deallocate the reserved physical memory.
     void arena_reset(arena* p_arena);
     void arena_release(arena* p_arena);
 
