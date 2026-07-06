@@ -32,16 +32,16 @@ jobs:
           sudo apt-get install -y wget software-properties-common gnupg cppcheck
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh ${{ env.LLVM_VERSION }}
+          sudo ./llvm.sh "$LLVM_VERSION
           rm -f llvm.sh
-          sudo apt-get install -y clang-tidy-${{ env.LLVM_VERSION }} libc++-${{ env.LLVM_VERSION }}-dev libc++abi-${{ env.LLVM_VERSION }}-dev
+          sudo apt-get install -y "clang-tidy-$LLVM_VERSION" "libc++-$LLVM_VERSION-dev" "libc++abi-$LLVM_VERSION-dev"
 
       - name: Select LLVM ${{ env.LLVM_VERSION }} Toolchain
         run: |
           set -e
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.LLVM_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ env.LLVM_VERSION }} 100
-          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-${{ env.LLVM_VERSION }} 100
+          sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-$LLVM_VERSION" 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-$LLVM_VERSION" 100
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
           clang --version
           clang-tidy --version
 
