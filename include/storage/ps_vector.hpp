@@ -103,7 +103,7 @@ public:
         {
             return static_cast<std::size_t>(std::distance(m_data.begin(), it));
         }
-        return std::unexpected(ErrorCode::ITEM_NOT_FOUND);
+        return std::unexpected(ErrorCode::ItemNotFound);
     }
 
     void append(T&& t)
@@ -157,10 +157,10 @@ public:
     /// due to the fact that elements may pop/swap/be moved and the underlying
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
-    /// don't use this.
+    /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<const T*, ErrorCode> get(std::size_t idx) const
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ITEM_NOT_FOUND); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
         return &m_data[idx];
     }
 
@@ -169,10 +169,10 @@ public:
     /// due to the fact that elements may pop/swap/be moved and the underlying
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
-    /// don't use this.
+    /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<T*, ErrorCode> get(std::size_t idx)
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ITEM_NOT_FOUND); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
         return &m_data[idx];
     }
 
