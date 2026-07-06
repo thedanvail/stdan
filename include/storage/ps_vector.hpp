@@ -160,7 +160,7 @@ public:
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<const T*, ErrorCode> get(std::size_t idx) const
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::IndexOutOfBounds); }
         return &m_data[idx];
     }
 
@@ -172,7 +172,7 @@ public:
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<T*, ErrorCode> get(std::size_t idx)
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::IndexOutOfBounds); }
         return &m_data[idx];
     }
 
