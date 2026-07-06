@@ -1,5 +1,7 @@
 #pragma once
 
+#include "storage_base.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <concepts>
@@ -51,11 +53,6 @@ public:
     ps_vector& operator=(ps_vector&& aOther)      = default;
     ps_vector& operator=(const ps_vector& aOther) = default;
 
-    enum class ErrorCode
-    {
-        ITEM_NOT_FOUND
-    };
-
 private:
     std::vector<T> m_data;
     std::size_t m_capacity;
@@ -77,7 +74,7 @@ public:
     std::size_t capacity() const { return m_capacity; }
     std::size_t first_available() const { return m_firstAvailableEntry; }
 
-    [[nodiscard]] T& operator[](std::size_t idx) noexcept
+    [[nodiscard]] T& operator[](std::size_t idx)
     {
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
@@ -85,7 +82,7 @@ public:
         return m_data[idx];
     }
 
-    [[nodiscard]] const T& operator[](std::size_t idx) const noexcept
+    [[nodiscard]] const T& operator[](std::size_t idx) const
     {
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
