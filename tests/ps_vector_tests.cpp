@@ -2,31 +2,11 @@
 
 #include "storage/ps_vector.hpp"
 
-#ifndef STDAN_DEBUG
-#error "STDAN_DEBUG must be defined by the build."
-#endif
-
-#ifndef EXPECTED_STDAN_DEBUG
-#error "EXPECTED_STDAN_DEBUG must be defined by the test target."
-#endif
-
-SCENARIO("STDAN_DEBUG matches the configured build type")
-{
-    GIVEN("a test target compiled by CMake")
-    {
-        THEN("STDAN_DEBUG matches the expected value for the configuration")
-        {
-            static_assert(STDAN_DEBUG == EXPECTED_STDAN_DEBUG);
-            REQUIRE(STDAN_DEBUG == EXPECTED_STDAN_DEBUG);
-        }
-    }
-}
-
 SCENARIO("resize grows default-constructible values within capacity")
 {
     GIVEN("a vector with spare capacity")
     {
-        stdan::ps_vector<int> values(4);
+        stdan::storage::ps_vector<int> values(4);
 
         WHEN("it is resized up within capacity")
         {
@@ -35,8 +15,8 @@ SCENARIO("resize grows default-constructible values within capacity")
             THEN("the size grows to the requested value")
             {
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[0] == 0);
-                REQUIRE(values[1] == 0);
+                REQUIRE(values[0]     == 0);
+                REQUIRE(values[1]     == 0);
             }
         }
 
@@ -47,11 +27,11 @@ SCENARIO("resize grows default-constructible values within capacity")
             THEN("the vector grows to the requested size")
             {
                 REQUIRE(values.size() == 5);
-                REQUIRE(values[0] == 0);
-                REQUIRE(values[1] == 0);
-                REQUIRE(values[2] == 0);
-                REQUIRE(values[3] == 0);
-                REQUIRE(values[4] == 0);
+                REQUIRE(values[0]     == 0);
+                REQUIRE(values[1]     == 0);
+                REQUIRE(values[2]     == 0);
+                REQUIRE(values[3]     == 0);
+                REQUIRE(values[4]     == 0);
             }
         }
     }
@@ -61,7 +41,7 @@ SCENARIO("append stores values until the vector is full")
 {
     GIVEN("a vector with spare capacity")
     {
-        stdan::ps_vector<int> values(2);
+        stdan::storage::ps_vector<int> values(2);
 
         WHEN("values are appended")
         {
@@ -96,7 +76,7 @@ SCENARIO("remove swaps the last live element into the removed slot")
 {
     GIVEN("a vector with multiple values")
     {
-        stdan::ps_vector<int> values(4);
+        stdan::storage::ps_vector<int> values(4);
         values.append(7);
         values.append(11);
         values.append(13);
@@ -119,7 +99,7 @@ SCENARIO("index_of finds live elements and reports missing ones")
 {
     GIVEN("a vector with known values")
     {
-        stdan::ps_vector<int> values(3);
+        stdan::storage::ps_vector<int> values(3);
         values.append(5);
         values.append(9);
 

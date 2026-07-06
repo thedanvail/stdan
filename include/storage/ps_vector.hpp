@@ -10,7 +10,7 @@
 #include <utility>
 #include <vector>
 
-namespace stdan
+namespace stdan::storage
 {
 
 template <typename T>

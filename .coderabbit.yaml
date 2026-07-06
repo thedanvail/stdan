@@ -1,0 +1,8 @@
+# .coderabbit.yaml
+language: "en"
+reviews:
+  profile: "assertive"
+  # Enable formal GitHub PR approvals/request changes
+  request_changes_workflow: true
+  high_level_summary: true
+

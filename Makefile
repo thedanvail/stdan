@@ -10,7 +10,7 @@ all: build
 # --- Configure (generates build system + compile_commands.json) ---
 
 configure:
-	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS)
+	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS) $(CMAKE_ARGS)
 	@ln -sf $(BUILD_DIR)/compile_commands.json compile_commands.json
 
 # --- Build (auto-configures if needed) ---
@@ -39,7 +39,8 @@ fmt: format
 
 # --- compile_commands.json shortcut ---
 
-cc: configure
+cc:
+	$(MAKE) configure STDAN_BUILD_TESTS=ON
 	@echo "compile_commands.json symlinked to project root"
 
 # --- Clean ---
