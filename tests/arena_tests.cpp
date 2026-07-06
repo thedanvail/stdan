@@ -130,7 +130,7 @@ TEST_CASE("arena_alloc propagates out-of-space failures")
 
     auto result = arena_alloc(a, 8192);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::WouldUnderflow);
+    REQUIRE(result.error() == arena_alloc_error::NotEnoughMemory);
 
     arena_release(a);
 }

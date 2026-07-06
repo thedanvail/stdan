@@ -1,5 +1,5 @@
-#include "arena.hpp"
-#include "memory_base.hpp"
+#include "memory/arena.hpp"
+#include "memory/memory_base.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -43,16 +43,20 @@ namespace stdan::memory
         if(reserve_size == 0) { return std::unexpected(arena_alloc_error::ZeroSize); }
         arena* ret = static_cast<arena*>(std::malloc(sizeof(arena)));
         if(ret == nullptr) { return std::unexpected(arena_alloc_error::CouldNotReserveMemory); }
-        
-        // TODO: check for reserve size overflow
+
+        // Check for reserve size overflow before rounding up to the nearest page boundary.
+        if(reserve_size > (SIZE_MAX - (PAGE_SIZE - 1)))
+        {
+            std::free(ret);
+            return std::unexpected(arena_alloc_error::ReserveSizeOverflow);
+        }
         reserve_size = (reserve_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-        if(reserve_size > (SIZE_MAX - (PAGE_SIZE - 1))) { return std::unexpected(arena_alloc_error::ReserveSizeOverflow); }
 #ifdef _WIN32
         void* block = VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
         if(block == nullptr)
         {
             std::free(ret);
-            return std::unexpected(arena_alloc_error::MallocFailed);
+            return std::unexpected(arena_alloc_error::CouldNotReserveMemory);
         }
 #else
         void* block = mmap(

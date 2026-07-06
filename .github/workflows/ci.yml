@@ -2,7 +2,7 @@ name: Static Analysis
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -10,6 +10,10 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  LLVM_VERSION: 18
+  CMAKE_ARGS: -DCMAKE_CXX_FLAGS=-stdlib=libc++
 
 jobs:
   analyze:
@@ -21,19 +25,33 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install Tools
+      - name: Install LLVM ${{ env.LLVM_VERSION }}
         run: |
+          set -e
           sudo apt-get update
-          sudo apt-get install -y clang-tidy cppcheck
+          sudo apt-get install -y wget software-properties-common gnupg cppcheck
+          wget -q https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.LLVM_VERSION }}
+          rm -f llvm.sh
+          sudo apt-get install -y clang-tidy-${{ env.LLVM_VERSION }} libc++-${{ env.LLVM_VERSION }}-dev libc++abi-${{ env.LLVM_VERSION }}-dev
+
+      - name: Select LLVM ${{ env.LLVM_VERSION }} Toolchain
+        run: |
+          set -e
+          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ env.LLVM_VERSION }} 100
+          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ env.LLVM_VERSION }} 100
+          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-${{ env.LLVM_VERSION }} 100
+          clang --version
+          clang-tidy --version
 
       - name: Generate Compile Commands
         run: make cc
 
       - name: Run Clang-Tidy
         run: |
-          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) -print | xargs clang-tidy -p . --warnings-as-errors=* -extra-arg=-std=c++23
+          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) -print | xargs clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=* -extra-arg=-std=c++23 -extra-arg=-stdlib=libc++
 
       - name: Run Cppcheck
         run: |
           cppcheck --enable=all --error-exitcode=1 -i vendor -i build src include
-
