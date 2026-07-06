@@ -1,5 +1,7 @@
 #pragma once
 
+#include "storage_base.hpp"
+
 #include <algorithm>
 #include <cassert>
 #include <concepts>
@@ -51,11 +53,6 @@ public:
     ps_vector& operator=(ps_vector&& aOther)      = default;
     ps_vector& operator=(const ps_vector& aOther) = default;
 
-    enum class ErrorCode
-    {
-        ITEM_NOT_FOUND
-    };
-
 private:
     std::vector<T> m_data;
     std::size_t m_capacity;
@@ -77,7 +74,7 @@ public:
     std::size_t capacity() const { return m_capacity; }
     std::size_t first_available() const { return m_firstAvailableEntry; }
 
-    [[nodiscard]] T& operator[](std::size_t idx) noexcept
+    [[nodiscard]] T& operator[](std::size_t idx)
     {
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
@@ -85,7 +82,7 @@ public:
         return m_data[idx];
     }
 
-    [[nodiscard]] const T& operator[](std::size_t idx) const noexcept
+    [[nodiscard]] const T& operator[](std::size_t idx) const
     {
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
@@ -106,7 +103,7 @@ public:
         {
             return static_cast<std::size_t>(std::distance(m_data.begin(), it));
         }
-        return std::unexpected(ErrorCode::ITEM_NOT_FOUND);
+        return std::unexpected(ErrorCode::ItemNotFound);
     }
 
     void append(T&& t)
@@ -160,10 +157,10 @@ public:
     /// due to the fact that elements may pop/swap/be moved and the underlying
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
-    /// don't use this.
+    /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<const T*, ErrorCode> get(std::size_t idx) const
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ITEM_NOT_FOUND); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
         return &m_data[idx];
     }
 
@@ -172,10 +169,10 @@ public:
     /// due to the fact that elements may pop/swap/be moved and the underlying
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
-    /// don't use this.
+    /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<T*, ErrorCode> get(std::size_t idx)
     {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ITEM_NOT_FOUND); }
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::ItemNotFound); }
         return &m_data[idx];
     }
 
