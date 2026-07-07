@@ -57,9 +57,17 @@ jobs:
 
       - name: Run Clang-Tidy
         run: |
+          set -e
+          LIBCXX_INCLUDE="$(dpkg -L "libc++-$LLVM_VERSION-dev" | grep '/c++/v1$' | head -n1)"
+          test -n "$LIBCXX_INCLUDE"
           jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
             | sort -u \
-            | xargs -r clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+            | xargs -r clang-tidy -p . \
+                --extra-arg=-stdlib=libc++ \
+                --extra-arg=-isystem \
+                --extra-arg="$LIBCXX_INCLUDE" \
+                --checks='-*,clang-analyzer-*' \
+                --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
