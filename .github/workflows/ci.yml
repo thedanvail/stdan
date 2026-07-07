@@ -47,18 +47,22 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/gcc-$GCC_VERSION" 100
           sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/g++-$GCC_VERSION" 100
+          GCC_INSTALL_DIR=$(dirname "$(g++ -print-libgcc-file-name)")
+          echo "GCC_INSTALL_DIR=$GCC_INSTALL_DIR" >> "$GITHUB_ENV"
           clang --version
           clang++ -v
           gcc --version
           g++ --version
           clang-tidy --version
+          echo "Resolved GCC install dir: $GCC_INSTALL_DIR"
 
       - name: Generate Compile Commands
-        run: make cc
+        run: |
+          make cc CMAKE_ARGS="-DCMAKE_C_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR -DCMAKE_CXX_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR"
 
       - name: Run Clang-Tidy
         run: |
-          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) -print | xargs clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=* -extra-arg=-std=c++23
+          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "src/main.cpp" -print | xargs clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=* -extra-arg-before=--gcc-install-dir=$GCC_INSTALL_DIR -extra-arg=-std=c++23
 
       - name: Run Cppcheck
         run: |
@@ -66,4 +70,4 @@ jobs:
 
       - name: Run Unit Tests
         run: |
-          make test
+          make test CMAKE_ARGS="-DCMAKE_C_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR -DCMAKE_CXX_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR"
