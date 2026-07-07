@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  LLVM_VERSION: 18
+  LLVM_VERSION: 22
   GCC_VERSION: 14
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
         with:
           submodules: recursive
           persist-credentials: false
@@ -47,27 +47,30 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/gcc-$GCC_VERSION" 100
           sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/g++-$GCC_VERSION" 100
-          GCC_INSTALL_DIR=$(dirname "$(g++ -print-libgcc-file-name)")
-          echo "GCC_INSTALL_DIR=$GCC_INSTALL_DIR" >> "$GITHUB_ENV"
           clang --version
           clang++ -v
           gcc --version
           g++ --version
           clang-tidy --version
-          echo "Resolved GCC install dir: $GCC_INSTALL_DIR"
 
       - name: Generate Compile Commands
-        run: |
-          make cc CMAKE_ARGS="-DCMAKE_C_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR -DCMAKE_CXX_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR"
+        run: make cc
 
       - name: Run Clang-Tidy
         run: |
-          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) ! -path "src/main.cpp" -print | xargs clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=* -extra-arg-before=--gcc-install-dir=$GCC_INSTALL_DIR -extra-arg=-std=c++23
+          python - <<'PY' > /tmp/clang_tidy_files.txt
+          import json
+          with open('compile_commands.json') as f:
+              for entry in json.load(f):
+                  path = entry['file']
+                  if '/vendor/' not in path and path.endswith(('.cpp', '.cc', '.cxx')):
+                      print(path)
+          PY
+          xargs -a /tmp/clang_tidy_files.txt clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
           cppcheck --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
 
       - name: Run Unit Tests
-        run: |
-          make test CMAKE_ARGS="-DCMAKE_C_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR -DCMAKE_CXX_FLAGS=--gcc-install-dir=$GCC_INSTALL_DIR"
+        run: make test
