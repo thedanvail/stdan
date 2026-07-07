@@ -13,11 +13,13 @@ permissions:
 
 env:
   LLVM_VERSION: 22
-  GCC_VERSION: 14
 
 jobs:
   analyze:
     runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - name: Checkout Code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
@@ -25,48 +27,39 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install LLVM ${{ env.LLVM_VERSION }} and GCC ${{ env.GCC_VERSION }}
+      - name: Install LLVM ${{ env.LLVM_VERSION }} toolchain
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y wget software-properties-common gnupg cppcheck
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-          sudo apt-get update
-          sudo apt-get install -y "gcc-$GCC_VERSION" "g++-$GCC_VERSION"
+          sudo apt-get install -y wget gnupg cppcheck jq
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh "$LLVM_VERSION"
           rm -f llvm.sh
-          sudo apt-get install -y "clang-tidy-$LLVM_VERSION"
+          sudo apt-get install -y \
+            "clang-tidy-$LLVM_VERSION" \
+            "libc++-$LLVM_VERSION-dev" \
+            "libc++abi-$LLVM_VERSION-dev" \
+            "libunwind-$LLVM_VERSION-dev"
 
-      - name: Select LLVM ${{ env.LLVM_VERSION }} and GCC ${{ env.GCC_VERSION }} toolchains
+      - name: Select LLVM ${{ env.LLVM_VERSION }} toolchain
         run: |
           set -e
           sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
-          sudo update-alternatives --install /usr/bin/gcc gcc "/usr/bin/gcc-$GCC_VERSION" 100
-          sudo update-alternatives --install /usr/bin/g++ g++ "/usr/bin/g++-$GCC_VERSION" 100
           clang --version
           clang++ -v
-          gcc --version
-          g++ --version
           clang-tidy --version
 
       - name: Generate Compile Commands
-        run: make cc
+        run: make cc CMAKE_ARGS="-DSTDAN_USE_LIBCXX=ON"
 
       - name: Run Clang-Tidy
         run: |
-          python - <<'PY' > /tmp/clang_tidy_files.txt
-          import json
-          with open('compile_commands.json') as f:
-              for entry in json.load(f):
-                  path = entry['file']
-                  if '/vendor/' not in path and path.endswith(('.cpp', '.cc', '.cxx')):
-                      print(path)
-          PY
-          xargs -a /tmp/clang_tidy_files.txt clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+          jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
+            | sort -u \
+            | xargs -r clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
