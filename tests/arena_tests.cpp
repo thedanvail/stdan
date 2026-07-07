@@ -3,7 +3,7 @@
 #include "arena.hpp"
 
 using stdan::memory::arena;
-using stdan::memory::arena_alloc_error;
+using stdan::memory::alloc_error;
 using stdan::memory::arena_alloc;
 using stdan::memory::arena_construct;
 using stdan::memory::arena_release;
@@ -29,14 +29,14 @@ TEST_CASE("create_arena fails for zero size")
 {
     auto result = create_arena(0);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::ZeroSize);
+    REQUIRE(result.error() == alloc_error::ZeroSize);
 }
 
 TEST_CASE("arena_alloc rejects null arena")
 {
     auto result = arena_alloc(nullptr, 64);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::NullPointerArenaArg);
+    REQUIRE(result.error() == alloc_error::NullPointerArenaArg);
 }
 
 TEST_CASE("arena_alloc rejects zero size")
@@ -47,7 +47,7 @@ TEST_CASE("arena_alloc rejects zero size")
 
     auto result = arena_alloc(a, 0);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::ZeroSize);
+    REQUIRE(result.error() == alloc_error::ZeroSize);
 
     arena_release(a);
 }
@@ -60,7 +60,7 @@ TEST_CASE("arena_alloc rejects non-power-of-two alignment")
 
     auto result = arena_alloc(a, 64, 3);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::BadAlignment);
+    REQUIRE(result.error() == alloc_error::BadAlignment);
 
     arena_release(a);
 }
@@ -130,7 +130,7 @@ TEST_CASE("arena_alloc propagates out-of-space failures")
 
     auto result = arena_alloc(a, 8192);
     REQUIRE_FALSE(result.has_value());
-    REQUIRE(result.error() == arena_alloc_error::NotEnoughMemory);
+    REQUIRE(result.error() == alloc_error::NotEnoughMemory);
 
     arena_release(a);
 }
