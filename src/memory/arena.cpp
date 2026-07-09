@@ -48,8 +48,7 @@ namespace stdan::memory {
         reserve_size = (reserve_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 #ifdef _WIN32
         void* block = VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
-        if(block == nullptr)
-        {
+        if(block == nullptr) {
             std::free(ret);
             return std::unexpected(alloc_error::CouldNotReserveMemory);
         }

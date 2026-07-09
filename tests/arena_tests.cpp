@@ -10,8 +10,7 @@ using stdan::memory::arena_release;
 using stdan::memory::arena_reset;
 using stdan::memory::create_arena;
 
-TEST_CASE("create_arena returns a valid arena for reasonable sizes")
-{
+TEST_CASE("create_arena returns a valid arena for reasonable sizes") {
     auto result = create_arena(4096);
     REQUIRE(result.has_value());
 
@@ -25,22 +24,19 @@ TEST_CASE("create_arena returns a valid arena for reasonable sizes")
     arena_release(a);
 }
 
-TEST_CASE("create_arena fails for zero size")
-{
+TEST_CASE("create_arena fails for zero size") {
     auto result = create_arena(0);
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error() == alloc_error::ZeroSize);
 }
 
-TEST_CASE("arena_alloc rejects null arena")
-{
+TEST_CASE("arena_alloc rejects null arena") {
     auto result = arena_alloc(nullptr, 64);
     REQUIRE_FALSE(result.has_value());
     REQUIRE(result.error() == alloc_error::NullPointerArenaArg);
 }
 
-TEST_CASE("arena_alloc rejects zero size")
-{
+TEST_CASE("arena_alloc rejects zero size") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -52,8 +48,7 @@ TEST_CASE("arena_alloc rejects zero size")
     arena_release(a);
 }
 
-TEST_CASE("arena_alloc rejects non-power-of-two alignment")
-{
+TEST_CASE("arena_alloc rejects non-power-of-two alignment") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -65,8 +60,7 @@ TEST_CASE("arena_alloc rejects non-power-of-two alignment")
     arena_release(a);
 }
 
-TEST_CASE("arena_alloc returns memory aligned to the requested alignment")
-{
+TEST_CASE("arena_alloc returns memory aligned to the requested alignment") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -78,8 +72,7 @@ TEST_CASE("arena_alloc returns memory aligned to the requested alignment")
     arena_release(a);
 }
 
-TEST_CASE("arena_alloc returns non-overlapping regions")
-{
+TEST_CASE("arena_alloc returns non-overlapping regions") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -93,8 +86,7 @@ TEST_CASE("arena_alloc returns non-overlapping regions")
     arena_release(a);
 }
 
-TEST_CASE("arena_reset resets the current offset")
-{
+TEST_CASE("arena_reset resets the current offset") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -109,8 +101,7 @@ TEST_CASE("arena_reset resets the current offset")
     arena_release(a);
 }
 
-TEST_CASE("arena_construct builds a trivial type at the allocated address")
-{
+TEST_CASE("arena_construct builds a trivial type at the allocated address") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
@@ -122,8 +113,7 @@ TEST_CASE("arena_construct builds a trivial type at the allocated address")
     arena_release(a);
 }
 
-TEST_CASE("arena_alloc propagates out-of-space failures")
-{
+TEST_CASE("arena_alloc propagates out-of-space failures") {
     auto arena_result = create_arena(4096);
     REQUIRE(arena_result.has_value());
     arena* a = arena_result.value();
