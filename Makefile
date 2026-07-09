@@ -2,8 +2,11 @@ BUILD_DIR         := build
 BUILD_TYPE        ?= Debug
 STDAN_BUILD_TESTS ?= OFF
 JOBS              ?= $(shell nproc 2>/dev/null || echo 4)
+CLANG_TIDY        ?= clang-tidy
+CPPCHECK          ?= cppcheck
+JQ                ?= jq
 
-.PHONY: all configure build release test format clean compile_commands cc
+.PHONY: all configure build release test format clean compile_commands cc tidy cppcheck ci
 
 all: build
 
@@ -42,6 +45,21 @@ fmt: format
 cc:
 	$(MAKE) configure STDAN_BUILD_TESTS=ON
 	@echo "compile_commands.json symlinked to project root"
+
+tidy: cc
+	$(JQ) -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$$"))' compile_commands.json \
+		| sort -u \
+		| xargs -r $(CLANG_TIDY) -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+
+cppcheck:
+	$(CPPCHECK) --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
+
+ci:
+	$(MAKE) clean
+	$(MAKE) cc
+	$(MAKE) tidy
+	$(MAKE) cppcheck
+	$(MAKE) test
 
 # --- Clean ---
 

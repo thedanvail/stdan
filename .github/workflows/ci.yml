@@ -12,51 +12,52 @@ permissions:
   contents: read
 
 env:
-  LLVM_VERSION: 18
-  CMAKE_ARGS: -DCMAKE_CXX_FLAGS=-stdlib=libc++
+  LLVM_VERSION: 22
 
 jobs:
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      CC: gcc
+      CXX: g++
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install LLVM ${{ env.LLVM_VERSION }}
+      - name: Install LLVM ${{ env.LLVM_VERSION }} toolchain
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y wget software-properties-common gnupg cppcheck
-          wget -q https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh "$LLVM_VERSION"
-          rm -f llvm.sh
-          sudo apt-get install -y "clang-tidy-$LLVM_VERSION" "libc++-$LLVM_VERSION-dev" "libc++abi-$LLVM_VERSION-dev"
+          sudo apt-get install -y ca-certificates curl gnupg cppcheck jq
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${LLVM_VERSION} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y \
+            "clang-tidy-$LLVM_VERSION"
 
-      - name: Select LLVM ${{ env.LLVM_VERSION }} Toolchain
+      - name: Show toolchain versions
         run: |
-          set -e
-          sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-$LLVM_VERSION" 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-$LLVM_VERSION" 100
-          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
-          clang --version
-          clang-tidy --version
+          gcc --version
+          g++ --version
+          cmake --version
+          "clang-tidy-$LLVM_VERSION" --version
 
-      - name: Generate Compile Commands
-        run: make cc
-
-      - name: Run Clang-Tidy
+      - name: Prepare repo CI workspace
         run: |
-          find src include -path "*/vendor" -prune -o -type f \( -name "*.cpp" -o -name "*.h" \) -print | xargs clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=* -extra-arg=-std=c++23 -extra-arg=-stdlib=libc++
+          make clean
+          make cc
 
-      - name: Run Cppcheck
-        run: |
-          cppcheck --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
+      - name: Run clang-tidy
+        run: make tidy CLANG_TIDY="clang-tidy-$LLVM_VERSION"
 
-      - name: Run Unit Tests
-        run: |
-          make test
+      - name: Run cppcheck
+        run: make cppcheck
 
+      - name: Run tests
+        run: make test
