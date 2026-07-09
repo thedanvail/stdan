@@ -201,13 +201,15 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values 
         tracked_value::live_instances = 0;
 
         WHEN("the array goes out of scope") {
-            auto values = make_values<tracked_value, 4>();
-            values.emplace_back(tracked_value{7});
-            values.emplace_back(tracked_value{11});
+            {
+                auto values = make_values<tracked_value, 4>();
+                values.emplace_back(tracked_value{7});
+                values.emplace_back(tracked_value{11});
 
-            REQUIRE(values.size() == 2);
-            REQUIRE(tracked_value::live_instances == 2);
-            tracked_value::destructor_calls = 0;
+                REQUIRE(values.size() == 2);
+                REQUIRE(tracked_value::live_instances == 2);
+                tracked_value::destructor_calls = 0;
+            }
 
             THEN("the live elements are destroyed") {
                 REQUIRE(tracked_value::destructor_calls == 2);
