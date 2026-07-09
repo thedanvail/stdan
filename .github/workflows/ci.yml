@@ -61,7 +61,7 @@ jobs:
         run: |
           jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
             | sort -u \
-            | xargs -r clang-tidy-22 -p . --query-driver="/usr/bin/clang++-$LLVM_VERSION" --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+            | xargs -r clang-tidy-22 -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
