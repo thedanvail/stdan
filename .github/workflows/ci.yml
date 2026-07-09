@@ -13,7 +13,6 @@ permissions:
 
 env:
   LLVM_VERSION: 22
-  GCC_VERSION: 14
 
 jobs:
   analyze:
@@ -21,7 +20,6 @@ jobs:
     env:
       CC: clang-22
       CXX: clang++-22
-      CMAKE_ARGS: -DSTDAN_USE_LIBCXX=ON
     steps:
       - name: Checkout Code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
@@ -29,16 +27,19 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install LLVM ${{ env.LLVM_VERSION }} and GCC ${{ env.GCC_VERSION }}
+      - name: Install LLVM ${{ env.LLVM_VERSION }} toolchain
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y wget gnupg cppcheck jq "gcc-$GCC_VERSION" "g++-$GCC_VERSION"
-          wget -q https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh "$LLVM_VERSION"
-          rm -f llvm.sh
+          sudo apt-get install -y ca-certificates curl gnupg cppcheck jq
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/${VERSION_CODENAME}/ llvm-toolchain-${VERSION_CODENAME}-${LLVM_VERSION} main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+          sudo apt-get update
           sudo apt-get install -y \
+            "clang-$LLVM_VERSION" \
             "clang-tidy-$LLVM_VERSION" \
             "libc++-$LLVM_VERSION-dev" \
             "libc++abi-$LLVM_VERSION-dev"
@@ -49,18 +50,18 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-$LLVM_VERSION" 100
           sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
-          clang --version
-          clang++ -v
-          clang-tidy --version
 
       - name: Generate Compile Commands
         run: make cc
+
+      - name: Show clang-tidy Version
+        run: clang-tidy-22 --version
 
       - name: Run Clang-Tidy
         run: |
           jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
             | sort -u \
-            | xargs -r clang-tidy-22 -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+            | xargs -r clang-tidy-22 -p . --query-driver="/usr/bin/clang++-$LLVM_VERSION" --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
