@@ -13,13 +13,14 @@ permissions:
 
 env:
   LLVM_VERSION: 22
+  GCC_VERSION: 14
 
 jobs:
   analyze:
     runs-on: ubuntu-24.04
     env:
-      CC: clang
-      CXX: clang++
+      CC: gcc-14
+      CXX: g++-14
     steps:
       - name: Checkout Code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
@@ -27,20 +28,16 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install LLVM ${{ env.LLVM_VERSION }} toolchain
+      - name: Install LLVM ${{ env.LLVM_VERSION }} and GCC ${{ env.GCC_VERSION }}
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y wget gnupg cppcheck jq
+          sudo apt-get install -y wget gnupg cppcheck jq "gcc-$GCC_VERSION" "g++-$GCC_VERSION"
           wget -q https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh "$LLVM_VERSION"
           rm -f llvm.sh
-          sudo apt-get install -y \
-            "clang-tidy-$LLVM_VERSION" \
-            "libc++-$LLVM_VERSION-dev" \
-            "libc++abi-$LLVM_VERSION-dev" \
-            "libunwind-$LLVM_VERSION-dev"
+          sudo apt-get install -y "clang-tidy-$LLVM_VERSION"
 
       - name: Select LLVM ${{ env.LLVM_VERSION }} toolchain
         run: |
@@ -53,21 +50,16 @@ jobs:
           clang-tidy --version
 
       - name: Generate Compile Commands
-        run: make cc CMAKE_ARGS="-DSTDAN_USE_LIBCXX=ON"
+        run: make cc
+
+      - name: Show clang-tidy Version
+        run: clang-tidy-22 --version
 
       - name: Run Clang-Tidy
         run: |
-          set -e
-          LIBCXX_INCLUDE="$(dpkg -L "libc++-$LLVM_VERSION-dev" | grep '/c++/v1$' | head -n1)"
-          test -n "$LIBCXX_INCLUDE"
           jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
             | sort -u \
-            | xargs -r clang-tidy -p . \
-                --extra-arg=-stdlib=libc++ \
-                --extra-arg=-isystem \
-                --extra-arg="$LIBCXX_INCLUDE" \
-                --checks='-*,clang-analyzer-*' \
-                --warnings-as-errors=*
+            | xargs -r clang-tidy-22 -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
       - name: Run Cppcheck
         run: |
