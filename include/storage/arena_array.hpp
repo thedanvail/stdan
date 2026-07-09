@@ -23,18 +23,18 @@ namespace stdan::storage {
         /// Ownership of the arena is considered to be taken over
         /// *solely* by the arena_array.
         arena_array(memory::arena* p_arena) {
-            if(p_arena == nullptr) { 
+            if(p_arena == nullptr) {
                 capacity_ = 0;
-                return; 
+                return;
             }
             arena_.reset(p_arena);
         }
-    
-        arena_array(std::unique_ptr<memory::arena> ptr) { 
+
+        arena_array(std::unique_ptr<memory::arena> ptr) {
             if(ptr == nullptr) { capacity_ = 0; }
-            arena_ = std::move(ptr); 
+            arena_ = std::move(ptr);
         }
-    
+
         ~arena_array() {
             if(!arena_) {
                 return;
@@ -47,14 +47,13 @@ namespace stdan::storage {
             memory::arena_release(ptr);
         }
 
-
-        std::size_t size()     const { return size_; }
+        std::size_t size() const { return size_; }
         std::size_t capacity() const { return capacity_; }
 
         arena_array(arena_array&& other)                 = delete;
         arena_array(const arena_array& other)            = delete;
         arena_array& operator=(const arena_array& other) = delete;
-    
+
         void reset() {
             if(!arena_) { return; }
             if constexpr (!std::is_trivially_destructible_v<T>) {
@@ -65,17 +64,19 @@ namespace stdan::storage {
             size_ = 0;
         }
 
-        // Sequentially bump-allocate and constructs the next element
-        // No-op if the arena is missing or capacity has been reached
-        bool emplace_back(T&& element) {
+        // Sequentially bump-allocate and constructs the next element.
+        // Returns false if the arena is missing, capacity has been reached,
+        // or construction/allocation fails.
+        template<typename... Args> requires std::is_nothrow_constructible_v<T, Args...>
+        bool emplace_back(Args&&... args) {
             if(!arena_ || size_ >= capacity_) { return false; }
 
-            auto created = memory::arena_construct<T>(arena_.get(), std::move(element));
+            auto created = memory::arena_construct<T>(arena_.get(), std::forward<Args>(args)...);
             if(!created) { return false; }
             ++size_;
             return true;
         }
-    
+
         std::optional<std::reference_wrapper<T>> get(std::size_t idx) {
             if(!arena_ || idx >= size_) { return {}; }
             auto ret = __get_offsets(idx);
@@ -84,7 +85,7 @@ namespace stdan::storage {
             if(target >= arena_->current_offset) { return {}; }
             return std::optional(std::ref(*reinterpret_cast<T*>(arena_->base_ptr + target)));
         }
-    
+
         std::optional<std::reference_wrapper<const T>> get(std::size_t idx) const {
             if(!arena_ || idx >= size_) { return {}; }
             auto ret = __get_offsets(idx);
@@ -111,7 +112,7 @@ namespace stdan::storage {
             }
             return std::make_tuple(target_offset, target_end);
         }
-    
+
         std::unique_ptr<memory::arena> arena_ = nullptr;
         std::size_t capacity_ = ElementCapacity;
         std::size_t size_ = 0;

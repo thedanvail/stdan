@@ -43,9 +43,9 @@ namespace {
         }
 
         template<typename T, std::size_t ElementCapacity>
-            stdan::storage::arena_array<T, ElementCapacity> make_values(std::size_t reserve_size = 4096) {
-                return stdan::storage::arena_array<T, ElementCapacity>(require_arena(reserve_size));
-            }
+        stdan::storage::arena_array<T, ElementCapacity> make_values(std::size_t reserve_size = 4096) {
+            return stdan::storage::arena_array<T, ElementCapacity>(require_arena(reserve_size));
+        }
     };
 } // namespace
 
@@ -129,7 +129,7 @@ SCENARIO_METHOD(arena_array_fixture, "appending past capacity") {
 }
 
 SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
-    GIVEN("an integer array with live elements") {
+    GIVEN("an array with live elements") {
         auto values = make_values<int, 3>();
         values.emplace_back(7);
         values.emplace_back(11);
@@ -200,7 +200,8 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values 
         tracked_value::destructor_calls = 0;
         tracked_value::live_instances = 0;
 
-        WHEN("the array goes out of scope") { {
+        WHEN("the array goes out of scope") {
+            {
                 auto values = make_values<tracked_value, 4>();
                 values.emplace_back(tracked_value{7});
                 values.emplace_back(tracked_value{11});
@@ -212,7 +213,6 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values 
 
             THEN("the live elements are destroyed") {
                 REQUIRE(tracked_value::destructor_calls == 2);
-                REQUIRE(tracked_value::destructor_calls >= 2);
                 REQUIRE(tracked_value::live_instances == 0);
             }
         }
