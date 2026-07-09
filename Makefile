@@ -8,7 +8,7 @@ CLANG_TIDY        ?= clang-tidy
 CPPCHECK          ?= cppcheck
 JQ                ?= jq
 CMAKE_ARGS        ?=
-CONFIGURE_ARGS    := -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS) $(CMAKE_ARGS)
+CONFIGURE_ARGS    := -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS) $(CMAKE_ARGS)
 
 .PHONY: all configure build release test format clean compile_commands cc tidy cppcheck ci
 
