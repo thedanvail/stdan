@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_C_COMPILER clang)
-set(CMAKE_CXX_COMPILER clang++)
-
 project(stdan CXX)
+
+include(CheckCXXSourceCompiles)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,6 +11,23 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(STDAN_BUILD_TESTS "Build stdan test targets" OFF)
+
+message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "CXX compiler path: ${CMAKE_CXX_COMPILER}")
+
+check_cxx_source_compiles([=[
+    #include <expected>
+
+    int main()
+    {
+        std::expected<int, int> value = 42;
+        return value.value();
+    }
+]=] STDAN_HAS_STD_EXPECTED)
+
+if(NOT STDAN_HAS_STD_EXPECTED)
+    message(FATAL_ERROR "std::expected is required; use GCC/libstdc++ or an explicitly configured clang+libc++ toolchain.")
+endif()
 
 file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(FILTER STDAN_SOURCES EXCLUDE REGEX "src/main\\.cpp$")

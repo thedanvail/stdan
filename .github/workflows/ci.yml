@@ -18,8 +18,9 @@ jobs:
   analyze:
     runs-on: ubuntu-24.04
     env:
-      CC: clang-22
-      CXX: clang++-22
+      CC: gcc
+      CXX: g++
+      CLANG_TIDY: clang-tidy-22
     steps:
       - name: Checkout Code
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
@@ -39,33 +40,14 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y \
-            "clang-$LLVM_VERSION" \
-            "clang-tidy-$LLVM_VERSION" \
-            "libc++-$LLVM_VERSION-dev" \
-            "libc++abi-$LLVM_VERSION-dev"
+            "clang-tidy-$LLVM_VERSION"
 
-      - name: Select LLVM ${{ env.LLVM_VERSION }} toolchain
+      - name: Show toolchain versions
         run: |
-          set -e
-          sudo update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-$LLVM_VERSION" 100
-          sudo update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-$LLVM_VERSION" 100
-          sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy "/usr/bin/clang-tidy-$LLVM_VERSION" 100
+          gcc --version
+          g++ --version
+          cmake --version
+          "$CLANG_TIDY" --version
 
-      - name: Generate Compile Commands
-        run: make cc
-
-      - name: Show clang-tidy Version
-        run: clang-tidy-22 --version
-
-      - name: Run Clang-Tidy
-        run: |
-          jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$"))' compile_commands.json \
-            | sort -u \
-            | xargs -r clang-tidy-22 -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
-
-      - name: Run Cppcheck
-        run: |
-          cppcheck --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
-
-      - name: Run Unit Tests
-        run: make test
+      - name: Run repo CI target
+        run: make ci CLANG_TIDY="$CLANG_TIDY"
