@@ -20,10 +20,9 @@ jobs:
     env:
       CC: gcc
       CXX: g++
-      CLANG_TIDY: clang-tidy-22
     steps:
       - name: Checkout Code
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           submodules: recursive
           persist-credentials: false
@@ -47,7 +46,18 @@ jobs:
           gcc --version
           g++ --version
           cmake --version
-          "$CLANG_TIDY" --version
+          "clang-tidy-$LLVM_VERSION" --version
 
-      - name: Run repo CI target
-        run: make ci CLANG_TIDY="$CLANG_TIDY"
+      - name: Prepare repo CI workspace
+        run: |
+          make clean
+          make cc
+
+      - name: Run clang-tidy
+        run: make tidy CLANG_TIDY="clang-tidy-$LLVM_VERSION"
+
+      - name: Run cppcheck
+        run: make cppcheck
+
+      - name: Run tests
+        run: make test
