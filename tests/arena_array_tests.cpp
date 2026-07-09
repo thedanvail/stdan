@@ -6,20 +6,33 @@
 namespace {
     struct tracked_value {
         inline static int destructor_calls = 0;
+        inline static int live_instances = 0;
 
         int value = 0;
 
-        tracked_value() = default;
+        tracked_value() { ++live_instances; }
         explicit tracked_value(int v)
             : value(v) {
+            ++live_instances;
         }
 
-        tracked_value(const tracked_value&)            = default;
-        tracked_value(tracked_value&&)                 = default;
+        tracked_value(const tracked_value& other)
+            : value(other.value) {
+            ++live_instances;
+        }
+
+        tracked_value(tracked_value&& other) noexcept
+            : value(other.value) {
+            ++live_instances;
+        }
+
         tracked_value& operator=(const tracked_value&) = default;
         tracked_value& operator=(tracked_value&&)      = default;
 
-        ~tracked_value() { ++destructor_calls; }
+        ~tracked_value() {
+            ++destructor_calls;
+            --live_instances;
+        }
     };
 
     struct arena_array_fixture {
@@ -116,7 +129,7 @@ SCENARIO_METHOD(arena_array_fixture, "appending past capacity") {
 }
 
 SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
-    GIVEN("an array with live elements") {
+    GIVEN("an integer array with live elements") {
         auto values = make_values<int, 3>();
         values.emplace_back(7);
         values.emplace_back(11);
@@ -139,23 +152,67 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
             }
         }
     }
+
+    GIVEN("a tracked array with live non-trivial elements") {
+        tracked_value::destructor_calls = 0;
+        tracked_value::live_instances = 0;
+
+        auto values = make_values<tracked_value, 3>();
+        values.emplace_back(tracked_value{7});
+        values.emplace_back(tracked_value{11});
+
+        auto first = values.get(0);
+        auto second = values.get(1);
+        REQUIRE(first.has_value());
+        REQUIRE(second.has_value());
+        REQUIRE(first->get().value == 7);
+        REQUIRE(second->get().value == 11);
+        REQUIRE(values.size() == 2);
+        REQUIRE(tracked_value::live_instances == 2);
+
+        const auto destructor_calls_before_reset = tracked_value::destructor_calls;
+
+        WHEN("the tracked array is reset") {
+            values.reset();
+
+            THEN("all live tracked values are destroyed and the array becomes empty") {
+                REQUIRE(tracked_value::destructor_calls == destructor_calls_before_reset + 2);
+                REQUIRE(tracked_value::live_instances == 0);
+                REQUIRE(values.size() == 0);
+                REQUIRE_FALSE(values.get(0).has_value());
+                REQUIRE_FALSE(values.get(1).has_value());
+            }
+
+            THEN("the array storage can be reused from the beginning") {
+                values.emplace_back(tracked_value{99});
+
+                REQUIRE(values.size() == 1);
+                REQUIRE(values.get(0).has_value());
+                REQUIRE(values.get(0)->get().value == 99);
+                REQUIRE(tracked_value::live_instances == 1);
+            }
+        }
+    }
 }
 
 SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values is destroyed") {
     GIVEN("a tracked type with two live instances") {
         tracked_value::destructor_calls = 0;
+        tracked_value::live_instances = 0;
 
         WHEN("the array goes out of scope") {
-            {
-                auto values = make_values<tracked_value, 4>();
-                values.emplace_back(tracked_value{7});
-                values.emplace_back(tracked_value{11});
+            auto values = make_values<tracked_value, 4>();
+            values.emplace_back(tracked_value{7});
+            values.emplace_back(tracked_value{11});
 
-                REQUIRE(values.size() == 2);
-                tracked_value::destructor_calls = 0;
-            }
+            REQUIRE(values.size() == 2);
+            REQUIRE(tracked_value::live_instances == 2);
+            tracked_value::destructor_calls = 0;
+
             THEN("the live elements are destroyed") {
                 REQUIRE(tracked_value::destructor_calls == 2);
+                REQUIRE(tracked_value::destructor_calls >= 2);
+                REQUIRE(tracked_value::live_instances == 0);
             }
         }
     }

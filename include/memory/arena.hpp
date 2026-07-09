@@ -39,7 +39,7 @@ namespace stdan::memory {
         return ::new (*raw) T(std::forward<Args>(args)...);
     }
 
-    template<typename T> requires std::is_nothrow_constructible_v<T>
+    template<typename T> requires std::is_nothrow_constructible_v<T, T&&>
     [[nodiscard]] inline std::expected<T*, alloc_error> arena_construct(arena* a, T&& t) {
         auto raw = arena_alloc(a, sizeof(T), alignof(T));
         if(!raw) { return std::unexpected(raw.error()); }

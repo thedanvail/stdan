@@ -57,19 +57,23 @@ namespace stdan::storage {
     
         void reset() {
             if(!arena_) { return; }
+            if constexpr (!std::is_trivially_destructible_v<T>) {
+                T* first = reinterpret_cast<T*>(arena_->base_ptr);
+                std::destroy(first, first + size_);
+            }
             stdan::memory::arena_reset(arena_.get());
             size_ = 0;
         }
-    
-        // If the target slot is already below the current bump pointer, we
-        // reconstruct in-place at that exact location. If the slot extends past
-        // the bump pointer, we allocate the gap up to and including that slot.
-        void emplace_back(T&& element) {
-            if(!arena_ || size_ >= capacity_) { return; }
+
+        // Sequentially bump-allocate and constructs the next element
+        // No-op if the arena is missing or capacity has been reached
+        bool emplace_back(T&& element) {
+            if(!arena_ || size_ >= capacity_) { return false; }
 
             auto created = memory::arena_construct<T>(arena_.get(), std::move(element));
-            if(!created) { return; }
+            if(!created) { return false; }
             ++size_;
+            return true;
         }
     
         std::optional<std::reference_wrapper<T>> get(std::size_t idx) {
@@ -99,7 +103,7 @@ namespace stdan::storage {
         }
 
     private:
-        inline std::expected<std::tuple<std::size_t, std::size_t>, memory::alloc_error> __get_offsets(std::size_t idx) {
+        const inline std::expected<std::tuple<std::size_t, std::size_t>, memory::alloc_error> __get_offsets(std::size_t idx) const {
             const std::size_t target_offset = idx * sizeof(T);
             const std::size_t target_end = target_offset + sizeof(T);
             if(target_end < target_offset || target_end > arena_->reserved_size) {
