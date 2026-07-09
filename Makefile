@@ -51,8 +51,8 @@ tidy: cc
 		| sort -u \
 		| xargs -r $(CLANG_TIDY) -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
-cppcheck: cc
-	$(CPPCHECK) --project=compile_commands.json --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build
+cppcheck:
+	$(CPPCHECK) --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
 
 ci:
 	$(MAKE) clean
