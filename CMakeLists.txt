@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.16)
 
+if(NOT DEFINED CMAKE_CXX_COMPILER)
+    set(CMAKE_CXX_COMPILER g++)
+endif()
+
 project(stdan CXX)
 
 set(CMAKE_CXX_STANDARD 23)
@@ -21,10 +25,6 @@ endif()
 
 message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CXX compiler path: ${CMAKE_CXX_COMPILER}")
-
-if(NOT STDAN_HAS_STD_EXPECTED)
-    message(FATAL_ERROR "std::expected is required; use GCC/libstdc++ or an explicitly configured clang+libc++ toolchain.")
-endif()
 
 file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
 list(FILTER STDAN_SOURCES EXCLUDE REGEX "src/main\\.cpp$")

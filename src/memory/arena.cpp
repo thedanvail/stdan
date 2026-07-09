@@ -100,6 +100,9 @@ namespace stdan::memory {
         }
 
         std::size_t new_offset = aligned_offset + size;
+        if(new_offset < aligned_offset) {
+            return std::unexpected(alloc_error::NotEnoughMemory);
+        }
 
         if(new_offset > p_arena->committed_size) {
             // Align the required commit size up to the nearest page
