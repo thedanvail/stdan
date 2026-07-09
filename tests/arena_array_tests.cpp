@@ -200,8 +200,7 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values 
         tracked_value::destructor_calls = 0;
         tracked_value::live_instances = 0;
 
-        WHEN("the array goes out of scope") {
-            {
+        WHEN("the array goes out of scope") { {
                 auto values = make_values<tracked_value, 4>();
                 values.emplace_back(tracked_value{7});
                 values.emplace_back(tracked_value{11});
