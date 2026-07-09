@@ -12,9 +12,6 @@
 namespace stdan::memory {
     // Lambda magic to just get the page size without worrying about
     // a function we'll never really use
-    // I should probably move this into some sort of `base.hpp` file
-    // since I'll likely use this across many memory modules, but for now,
-    // this'll do.
     static const std::size_t PAGE_SIZE = []() {
 #ifdef _WIN32
         SYSTEM_INFO sysInfo;
@@ -25,12 +22,18 @@ namespace stdan::memory {
 #endif
     }();
 
+
+    // TODO: Time to start breaking these up.
+    // OutOfBounds shouldn't be an alloc error unless it's 
+    // out of the bounds of the memory we're allocating.
+    // I shouldn't reuse it in containers.
     enum class alloc_error {
         NullPointerArenaArg,
         ZeroSize,
         BadAlignment,
         NotEnoughMemory,
         OffsetOverflow,
+        OutOfBounds,
         CouldNotCommitMemory,
         CouldNotReserveMemory,
         ReserveSizeOverflow

@@ -13,22 +13,19 @@
 #include <sys/mman.h>
 #endif
 
-namespace stdan::memory
-{
-    namespace
-    {
+namespace stdan::memory {
+    namespace {
         constexpr int FILE_DESCRIPTOR = -1;
         constexpr int OFFSET = 0;
     }
 
-    void arena_reset(arena* p_arena)
-    { 
-        if(p_arena == nullptr) { return; } 
+    // TODO: Perhaps we should zero-out everything upon reset?
+    void arena_reset(arena* p_arena) { 
+        if(p_arena == nullptr) { return; }
         p_arena->current_offset = 0;
     }
 
-    void arena_release(arena* p_arena)
-    {
+    void arena_release(arena* p_arena) {
         if(p_arena == nullptr) { return; }
 #ifdef _WIN32
         VirtualFree(p_arena->base_ptr, 0, MEM_RELEASE);
@@ -38,15 +35,13 @@ namespace stdan::memory
         std::free(p_arena);
     }
 
-    [[nodiscard]] std::expected<arena*, alloc_error> create_arena(std::size_t reserve_size)
-    {
+    [[nodiscard]] std::expected<arena*, alloc_error> create_arena(std::size_t reserve_size) {
         if(reserve_size == 0) { return std::unexpected(alloc_error::ZeroSize); }
         arena* ret = static_cast<arena*>(std::malloc(sizeof(arena)));
         if(ret == nullptr) { return std::unexpected(alloc_error::CouldNotReserveMemory); }
 
         // Check for reserve size overflow before rounding up to the nearest page boundary.
-        if(reserve_size > (SIZE_MAX - (PAGE_SIZE - 1)))
-        {
+        if(reserve_size > (SIZE_MAX - (PAGE_SIZE - 1))) {
             std::free(ret);
             return std::unexpected(alloc_error::ReserveSizeOverflow);
         }
@@ -67,8 +62,7 @@ namespace stdan::memory
                 FILE_DESCRIPTOR, 
                 OFFSET
         );
-        if(block == MAP_FAILED)
-        {
+        if(block == MAP_FAILED) {
             std::free(ret);
             return std::unexpected(alloc_error::CouldNotReserveMemory);
         }
@@ -80,14 +74,12 @@ namespace stdan::memory
         return ret;
     }
 
-    [[nodiscard]] std::expected<std::byte*, alloc_error> arena_alloc(arena* p_arena, std::size_t size, std::size_t alignment)
-    {
+    [[nodiscard]] std::expected<std::byte*, alloc_error> arena_alloc(arena* p_arena, std::size_t size, std::size_t alignment) {
         if(p_arena == nullptr) { return std::unexpected(alloc_error::NullPointerArenaArg); }
         if(size == 0) { return std::unexpected(alloc_error::ZeroSize); }
 
         // power of 2 check
-        if(alignment == 0 || (alignment & (alignment - 1)) != 0)
-        {
+        if(alignment == 0 || (alignment & (alignment - 1)) != 0) {
             return std::unexpected(alloc_error::BadAlignment);
         }
 
@@ -95,38 +87,32 @@ namespace stdan::memory
         std::size_t aligned_offset = (p_arena->current_offset + alignment - 1) & ~(alignment - 1);
 
         // overflow/underflow checks
-        if(aligned_offset < p_arena->current_offset)
-        { 
+        if(aligned_offset < p_arena->current_offset) { 
             return std::unexpected(alloc_error::OffsetOverflow);
         }
 
-        if(aligned_offset > p_arena->reserved_size)
-        {
+        if(aligned_offset > p_arena->reserved_size) {
             return std::unexpected(alloc_error::NotEnoughMemory);
         }
 
-        if(size > p_arena->reserved_size - aligned_offset)
-        { 
+        if(size > p_arena->reserved_size - aligned_offset) { 
             return std::unexpected(alloc_error::NotEnoughMemory);
         }
 
         std::size_t new_offset = aligned_offset + size;
 
-        if(new_offset > p_arena->committed_size)
-        {
+        if(new_offset > p_arena->committed_size) {
             // Align the required commit size up to the nearest page
-            std::size_t new_commit_target = (new_offset + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
-            std::size_t size_to_commit    = new_commit_target - p_arena->committed_size;
-            std::byte* commit_start_addr  = p_arena->base_ptr + p_arena->committed_size;
+            std::size_t new_commit_target  = (new_offset + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+            std::size_t size_to_commit     = new_commit_target - p_arena->committed_size;
+            std::byte*  commit_start_addr  = p_arena->base_ptr + p_arena->committed_size;
 
 #ifdef _WIN32
-            if(!VirtualAlloc(commit_start_addr, size_to_commit, MEM_COMMIT, PAGE_READWRITE))
-            { 
+            if(!VirtualAlloc(commit_start_addr, size_to_commit, MEM_COMMIT, PAGE_READWRITE)) { 
                 return std::unexpected(alloc_error::CouldNotCommitMemory);
             }
 #else
-            if(mprotect(commit_start_addr, size_to_commit, PROT_READ | PROT_WRITE) != 0)
-            {
+            if(mprotect(commit_start_addr, size_to_commit, PROT_READ | PROT_WRITE) != 0) {
                 return std::unexpected(alloc_error::CouldNotCommitMemory);
             }
 #endif

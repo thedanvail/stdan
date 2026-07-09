@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <expected>
 #include <new> // IWYU pragma: keep
+#include <type_traits>
 #include <utility>
 
 namespace stdan::memory
@@ -24,6 +25,7 @@ namespace stdan::memory
 
     [[nodiscard]] std::expected<arena*,     alloc_error> create_arena(std::size_t reserve_size);
     [[nodiscard]] std::expected<std::byte*, alloc_error> arena_alloc(arena* p_arena, std::size_t size, std::size_t alignment = alignof(std::max_align_t));
+
     /// Resets the offset pointer. Note that it does NOT deallocate the reserved physical memory.
     void arena_reset(arena* p_arena);
 
@@ -31,7 +33,7 @@ namespace stdan::memory
     /// the memory.
     void arena_release(arena* p_arena);
 
-    template<typename T, typename... Args>
+    template<typename T, typename... Args> requires std::is_nothrow_constructible_v<T, Args...>
     [[nodiscard]] inline std::expected<T*, alloc_error> arena_construct(arena* a, Args&&... args)
     {
         auto raw = arena_alloc(a, sizeof(T), alignof(T));
