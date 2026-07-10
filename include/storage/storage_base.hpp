@@ -1,7 +1,6 @@
 #pragma once
 
-namespace stdan::storage
-{
+namespace stdan::storage {
 enum class ErrorCode {
     ItemNotFound,
     IndexOutOfBounds

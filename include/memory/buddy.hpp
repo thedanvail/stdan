@@ -4,11 +4,9 @@
 #include <cmath>
 #include <cstddef>
 
-namespace stdan::memory 
-{
+namespace stdan::memory {
     template<std::size_t TotalSize, std::size_t Depth>
-    class buddy_alloc
-    {
+    class buddy_alloc {
 
     private:
         static constexpr std::size_t NumNodes = (1ULL << (Depth + 1)) - 1;
@@ -26,8 +24,7 @@ namespace stdan::memory
         size_t get_right_child(std::size_t i) { return i * 2 + 2; }
         size_t get_parent(std::size_t i) { return (i - 1) / 2; }
 
-        void mark_recursive(std::size_t aIndex, bool aValue)
-        {
+        void mark_recursive(std::size_t aIndex, bool aValue) {
             if (aIndex >= NumNodes) { return; }
 
             m_tree.set(aIndex, aValue);
@@ -35,8 +32,7 @@ namespace stdan::memory
             mark_recursive(get_right_child(aIndex), aValue);
         }
 
-        void clear_subtree(std::size_t aIndex)
-        {
+        void clear_subtree(std::size_t aIndex) {
             if (aIndex >= NumNodes) { return; }
 
             m_tree.set(aIndex, false);
@@ -44,8 +40,7 @@ namespace stdan::memory
             clear_subtree(get_right_child(aIndex));
         }
 
-        void unmark_recursive(std::size_t aIndex)
-        {
+        void unmark_recursive(std::size_t aIndex) {
             if (aIndex >= NumNodes) { return; }
 
             clear_subtree(aIndex);
@@ -58,19 +53,16 @@ namespace stdan::memory
 
             // Coalesce - if both buddies are free, free the parent too.
             // We're not ICE after all.
-            if (!m_tree.test(left) && !m_tree.test(right))
-            {
+            if (!m_tree.test(left) && !m_tree.test(right)) {
                 unmark_recursive(parent);
             }
         }
 
-        [[nodiscard]] std::size_t get_offset(std::size_t aIndex, std::size_t aBlockSize) const
-        {
+        [[nodiscard]] std::size_t get_offset(std::size_t aIndex, std::size_t aBlockSize) const {
             // level = log2(TotalSize / aBlockSize)
             std::size_t level = 0;
             std::size_t ratio = TotalSize / aBlockSize;
-            while (ratio >>= 1)
-            {
+            while (ratio >>= 1) {
                 ++level;
             }
 
@@ -78,34 +70,28 @@ namespace stdan::memory
             return (aIndex - firstIndexInLevel) * aBlockSize;
         }
 
-        [[nodiscard]] std::size_t find_node_index(std::size_t aOffset)
-        {
+        [[nodiscard]] std::size_t find_node_index(std::size_t aOffset) {
             // Walk down from the root following the offset, returning the
             // first allocated node whose range starts at aOffset.
             std::size_t index = 0;
             std::size_t blockSize = TotalSize;
 
-            while (index < NumNodes)
-            {
-                if (m_tree.test(index) && get_offset(index, blockSize) == aOffset)
-                {
+            while (index < NumNodes) {
+                if (m_tree.test(index) && get_offset(index, blockSize) == aOffset) {
                     return index;
                 }
 
                 blockSize /= 2;
-                if (blockSize < MinBlockSize)
-                {
+                if (blockSize < MinBlockSize) {
                     break;
                 }
 
                 // Decide whether to descend left or right based on offset
                 std::size_t left = get_left_child(index);
-                if (aOffset < get_offset(left, blockSize) + blockSize)
-                {
+                if (aOffset < get_offset(left, blockSize) + blockSize) {
                     index = left;
                 }
-                else
-                {
+                else {
                     index = get_right_child(index);
                 }
             }
@@ -114,20 +100,17 @@ namespace stdan::memory
         }
 
     public:
-        void* alloc(std::size_t aRequest)
-        {
+        void* alloc(std::size_t aRequest) {
             if(aRequest == 0 || aRequest > TotalSize) { return nullptr; }
 
             std::size_t blockSize = TotalSize;
             std::size_t index = 0;
 
-            while(index < NumNodes)
-            {
+            while(index < NumNodes) {
                 if(m_tree.test(index)) { return nullptr; }
 
                 // Stop if splitting further makes us go too small
-                if((blockSize / 2) < aRequest || blockSize == MinBlockSize)
-                {
+                if((blockSize / 2) < aRequest || blockSize == MinBlockSize) {
                     mark_recursive(index, true);
                     return m_pool + get_offset(index, blockSize);
                 }
@@ -139,8 +122,7 @@ namespace stdan::memory
             return nullptr;
         }
 
-        void dealloc(void* aPtr)
-        {
+        void dealloc(void* aPtr) {
             if(aPtr == nullptr) { return; }
             std::size_t offset = static_cast<std::byte*>(aPtr) - m_pool;
             std::size_t index = find_node_index(offset);

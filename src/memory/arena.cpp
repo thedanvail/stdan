@@ -1,5 +1,5 @@
-#include "arena.hpp"
-#include "memory_base.hpp"
+#include "memory/arena.hpp"
+#include "memory/memory_base.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -48,8 +48,7 @@ namespace stdan::memory {
         reserve_size = (reserve_size + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 #ifdef _WIN32
         void* block = VirtualAlloc(nullptr, reserve_size, MEM_RESERVE, PAGE_NOACCESS);
-        if(block == nullptr)
-        {
+        if(block == nullptr) {
             std::free(ret);
             return std::unexpected(alloc_error::CouldNotReserveMemory);
         }
@@ -100,6 +99,9 @@ namespace stdan::memory {
         }
 
         std::size_t new_offset = aligned_offset + size;
+        if(new_offset < aligned_offset) {
+            return std::unexpected(alloc_error::NotEnoughMemory);
+        }
 
         if(new_offset > p_arena->committed_size) {
             // Align the required commit size up to the nearest page

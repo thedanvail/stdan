@@ -1,6 +1,6 @@
 #pragma once
 
-#include "memory_base.hpp"
+#include "memory/memory_base.hpp"
 
 #include <cstddef>
 #include <expected>
@@ -8,15 +8,13 @@
 #include <type_traits>
 #include <utility>
 
-namespace stdan::memory
-{
+namespace stdan::memory {
     /// Your basic arena allocator - primarily designed for trivially-constructible types.
     /// You are responsible for any clean-up of non-trivially destructible types
     /// and you should be aware of the use cases/limitations of this - specifically,
     /// in loops (like a game engine update loop) and when you should/shouldn't use this.
     /// NOTE: It is not thread-safe. Maybe another time.
-    struct arena
-    {
+    struct arena {
         std::byte*  base_ptr;
         std::size_t reserved_size;
         std::size_t committed_size;
@@ -34,12 +32,18 @@ namespace stdan::memory
     void arena_release(arena* p_arena);
 
     template<typename T, typename... Args> requires std::is_nothrow_constructible_v<T, Args...>
-    [[nodiscard]] inline std::expected<T*, alloc_error> arena_construct(arena* a, Args&&... args)
-    {
+    [[nodiscard]] inline std::expected<T*, alloc_error> arena_construct(arena* a, Args&&... args) {
         auto raw = arena_alloc(a, sizeof(T), alignof(T));
         if(!raw) { return std::unexpected(raw.error()); }
         // placement new babyyyyyy
         return ::new (*raw) T(std::forward<Args>(args)...);
     }
-}
 
+    template<typename T> requires std::is_nothrow_constructible_v<T, T&&>
+    [[nodiscard]] inline std::expected<T*, alloc_error> arena_construct(arena* a, T&& t) {
+        auto raw = arena_alloc(a, sizeof(T), alignof(T));
+        if(!raw) { return std::unexpected(raw.error()); }
+        // placement new babyyyyyy
+        return ::new (*raw) T(std::move(t));
+    }
+}

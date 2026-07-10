@@ -22,23 +22,10 @@ endif()
 message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CXX compiler path: ${CMAKE_CXX_COMPILER}")
 
-if(NOT STDAN_HAS_STD_EXPECTED)
-    message(FATAL_ERROR "std::expected is required; use GCC/libstdc++ or an explicitly configured clang+libc++ toolchain.")
-endif()
-
 file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
-list(FILTER STDAN_SOURCES EXCLUDE REGEX "src/main\\.cpp$")
-file(GLOB_RECURSE STDAN_HEADERS CONFIGURE_DEPENDS include/*.hpp)
-set(STDAN_HEADER_DIRS)
-foreach(header IN LISTS STDAN_HEADERS)
-    get_filename_component(dir ${header} DIRECTORY)
-    list(APPEND STDAN_HEADER_DIRS ${dir})
-endforeach()
-list(REMOVE_DUPLICATES STDAN_HEADER_DIRS)
 
 add_library(stdan STATIC ${STDAN_SOURCES})
-target_include_directories(stdan PUBLIC include ${STDAN_HEADER_DIRS})
-target_sources(stdan PRIVATE ${STDAN_HEADERS})
+target_include_directories(stdan PUBLIC include)
 target_compile_definitions(stdan PUBLIC
     $<$<CONFIG:Debug>:STDAN_DEBUG=1>
     $<$<NOT:$<CONFIG:Debug>>:STDAN_DEBUG=0>
