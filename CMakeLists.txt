@@ -1,38 +1,19 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.20)
+project(stdan LANGUAGES CXX)
 
-if(NOT DEFINED CMAKE_CXX_COMPILER)
-    set(CMAKE_CXX_COMPILER g++)
-endif()
+option(STDAN_BUILD_TESTS "Build stdan tests" OFF)
 
-project(stdan CXX)
-
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-option(STDAN_BUILD_TESTS "Build stdan test targets" OFF)
-option(STDAN_USE_LIBCXX "Use libc++ when compiling with Clang" OFF)
+add_library(stdan STATIC
+    src/memory/arena.cpp
+)
 
-if(STDAN_USE_LIBCXX)
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        message(FATAL_ERROR "STDAN_USE_LIBCXX requires Clang")
-    endif()
-
-    add_compile_options(-stdlib=libc++)
-    add_link_options(-stdlib=libc++)
-endif()
-
-message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
-message(STATUS "CXX compiler path: ${CMAKE_CXX_COMPILER}")
-
-file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
-
-add_library(stdan STATIC ${STDAN_SOURCES})
+target_compile_features(stdan PUBLIC cxx_std_23)
+set_target_properties(stdan PROPERTIES CXX_EXTENSIONS OFF)
 target_include_directories(stdan PUBLIC include)
 target_compile_definitions(stdan PUBLIC
-    $<$<CONFIG:Debug>:STDAN_DEBUG=1>
-    $<$<NOT:$<CONFIG:Debug>>:STDAN_DEBUG=0>
+    $<$<CONFIG:Debug>:STDAN_DEBUG>
 )
 
 if(STDAN_BUILD_TESTS)

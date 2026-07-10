@@ -22,17 +22,14 @@ namespace stdan::storage {
         /// and passing the dependency in.
         /// Ownership of the arena is considered to be taken over
         /// *solely* by the arena_array.
-        arena_array(memory::arena* p_arena) {
-            if(p_arena == nullptr) {
-                capacity_ = 0;
-                return;
-            }
-            arena_.reset(p_arena);
+        explicit arena_array(memory::arena* p_arena)
+            : arena_(p_arena) {
+            if(p_arena == nullptr) { capacity_ = 0; }
         }
 
-        arena_array(std::unique_ptr<memory::arena> ptr) {
-            if(ptr == nullptr) { capacity_ = 0; }
-            arena_ = std::move(ptr);
+        explicit arena_array(memory::arena_owner ptr)
+            : arena_(std::move(ptr)) {
+            if(!arena_) { capacity_ = 0; }
         }
 
         ~arena_array() {
@@ -43,8 +40,6 @@ namespace stdan::storage {
                 T* first = reinterpret_cast<T*>(arena_->base_ptr);
                 std::destroy(first, first + size_);
             }
-            auto ptr = arena_.release();
-            memory::arena_release(ptr);
         }
 
         std::size_t size() const { return size_; }
@@ -113,7 +108,7 @@ namespace stdan::storage {
             return std::make_tuple(target_offset, target_end);
         }
 
-        std::unique_ptr<memory::arena> arena_ = nullptr;
+        memory::arena_owner arena_ = nullptr;
         std::size_t capacity_ = ElementCapacity;
         std::size_t size_ = 0;
     };

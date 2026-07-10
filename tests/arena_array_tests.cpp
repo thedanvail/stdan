@@ -3,6 +3,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <utility>
+
 namespace {
     struct tracked_value {
         inline static int destructor_calls = 0;
@@ -36,10 +38,10 @@ namespace {
     };
 
     struct arena_array_fixture {
-        static stdan::memory::arena* require_arena(std::size_t reserve_size = 4096) {
+        static stdan::memory::arena_owner require_arena(std::size_t reserve_size = 4096) {
             auto result = stdan::memory::create_arena(reserve_size);
             REQUIRE(result.has_value());
-            return result.value();
+            return std::move(result.value());
         }
 
         template<typename T, std::size_t ElementCapacity>

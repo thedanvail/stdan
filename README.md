@@ -13,7 +13,7 @@ The repository is organized to grow over time. New implementations, tests, and s
 
 ## Requirements
 
-- CMake 3.16 or newer
+- CMake 3.20 or newer
 - A C++23-capable compiler
 - `make` for the provided Makefile workflow (windows people can deal - they're on windows after all)
 

@@ -2,7 +2,9 @@
 
 #include <cassert>
 #include <cstddef>
+
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <sys/mman.h>
@@ -10,15 +12,16 @@
 #endif
 
 namespace stdan::memory {
-    // Lambda magic to just get the page size without worrying about
-    // a function we'll never really use
-    static const std::size_t PAGE_SIZE = []() {
+    /// The operating-system page size, or zero when it could not be queried.
+    /// `inline` ensures the query and value are shared by all translation units.
+    inline const std::size_t PAGE_SIZE = []() -> std::size_t {
 #ifdef _WIN32
-        SYSTEM_INFO sysInfo;
-        GetSystemInfo(&sysInfo);
-        return sysInfo.dwPageSize;
+        SYSTEM_INFO sys_info{};
+        GetSystemInfo(&sys_info);
+        return static_cast<std::size_t>(sys_info.dwPageSize);
 #else
-        return (std::size_t)sysconf(_SC_PAGESIZE);
+        const long page_size = sysconf(_SC_PAGESIZE);
+        return page_size > 0 ? static_cast<std::size_t>(page_size) : 0;
 #endif
     }();
 
@@ -36,6 +39,8 @@ namespace stdan::memory {
         OutOfBounds,
         CouldNotCommitMemory,
         CouldNotReserveMemory,
+        CouldNotReleaseMemory,
+        CouldNotDeterminePageSize,
         ReserveSizeOverflow
     };
 }
