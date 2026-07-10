@@ -2,6 +2,7 @@ BUILD_DIR  ?= build
 BUILD_TYPE ?= Debug
 JOBS       ?= $(shell nproc 2>/dev/null || echo 4)
 CMAKE_ARGS ?=
+CLANG_TIDY ?= clang-tidy
 
 .PHONY: all build release test format cc tidy cppcheck clean
 
@@ -33,7 +34,7 @@ cc:
 tidy: cc
 	jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$$"))' compile_commands.json \
 		| sort -u \
-		| xargs -r clang-tidy -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+		| xargs -r $(CLANG_TIDY) -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
 cppcheck:
 	cppcheck --enable=all --suppress=missingInclude --suppress=missingIncludeSystem \

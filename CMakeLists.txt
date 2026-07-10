@@ -5,9 +5,9 @@ option(STDAN_BUILD_TESTS "Build stdan tests" OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_library(stdan STATIC
-    src/memory/arena.cpp
-)
+file(GLOB_RECURSE STDAN_SOURCES CONFIGURE_DEPENDS src/*.cpp)
+
+add_library(stdan STATIC ${STDAN_SOURCES})
 
 target_compile_features(stdan PUBLIC cxx_std_23)
 set_target_properties(stdan PROPERTIES CXX_EXTENSIONS OFF)
