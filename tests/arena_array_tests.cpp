@@ -1,9 +1,6 @@
-#include "memory/arena.hpp"
 #include "storage/arena_array.hpp"
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <utility>
 
 namespace {
     struct tracked_value {
@@ -38,15 +35,9 @@ namespace {
     };
 
     struct arena_array_fixture {
-        static stdan::memory::arena_owner require_arena(std::size_t reserve_size = 4096) {
-            auto result = stdan::memory::create_arena(reserve_size);
-            REQUIRE(result.has_value());
-            return std::move(result.value());
-        }
-
         template<typename T, std::size_t ElementCapacity>
-        stdan::storage::arena_array<T, ElementCapacity> make_values(std::size_t reserve_size = 4096) {
-            return stdan::storage::arena_array<T, ElementCapacity>(require_arena(reserve_size));
+        stdan::storage::arena_array<T, ElementCapacity> make_values() {
+            return stdan::storage::arena_array<T, ElementCapacity>();
         }
     };
 } // namespace
@@ -58,26 +49,6 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array is created with a valid are
         THEN("it starts empty and reports its configured capacity") {
             REQUIRE(values.size() == 0);
             REQUIRE(values.capacity() == 3);
-        }
-    }
-}
-
-SCENARIO_METHOD(arena_array_fixture, "an arena_array is created with a null arena") {
-    GIVEN("a null arena pointer") {
-        stdan::storage::arena_array<int, 3> values(static_cast<stdan::memory::arena*>(nullptr));
-
-        THEN("the array reports zero capacity and stays empty") {
-            REQUIRE(values.size() == 0);
-            REQUIRE(values.capacity() == 0);
-        }
-
-        WHEN("an element is appended") {
-            values.emplace_back(42);
-
-            THEN("the append is ignored") {
-                REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(values.get(0).has_value());
-            }
         }
     }
 }

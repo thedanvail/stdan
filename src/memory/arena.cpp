@@ -1,4 +1,5 @@
 #include "memory/arena.hpp"
+#include "memory/memory_base.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -17,23 +18,29 @@ namespace stdan::memory {
         p_arena->current_offset = 0;
     }
 
+    /// On the incredibly rare occasion that the OS cannot free the memory,
+    /// we'll return the issue to the caller.
     std::expected<void, alloc_error> arena_release(arena* p_arena) noexcept {
         if(p_arena == nullptr) { return {}; }
+        bool released;
 #ifdef _WIN32
-        if(!VirtualFree(p_arena->base_ptr, 0, MEM_RELEASE)) {
-            return std::unexpected(alloc_error::CouldNotReleaseMemory);
-        }
+        released = VirtualFree(p_arena->base_ptr, 0, MEM_RELEASE) != 0;
 #else
-        if(munmap(p_arena->base_ptr, p_arena->reserved_size) != 0) {
+        released = munmap(p_arena->base_ptr, p_arena->reserved_size) == 0;
+#endif
+        // Do not free the metadata until we're sure this has succeeded
+        if(!released) {
             return std::unexpected(alloc_error::CouldNotReleaseMemory);
         }
-#endif
         std::free(p_arena);
         return {};
     }
 
+    /// Bog-standard deleter/free-er (that sounds weird)
+    /// This is my best attempt to effectively do GC with the
+    /// unique pointer.
     void arena_deleter::operator()(arena* p_arena) const noexcept {
-        arena_release(p_arena); // NOLINT(bugprone-unused-return-value)
+        static_cast<void>(arena_release(p_arena)); // NOLINT(bugprone-unused-return-value)
     }
 
     [[nodiscard]] std::expected<arena_owner, alloc_error> create_arena(std::size_t reserve_size) {

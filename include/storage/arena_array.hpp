@@ -7,6 +7,7 @@
 #include <expected>
 #include <functional>
 #include <memory>
+#include <new>
 #include <optional>
 #include <tuple>
 #include <type_traits>
@@ -22,13 +23,14 @@ namespace stdan::storage {
         /// and passing the dependency in.
         /// Ownership of the arena is considered to be taken over
         /// *solely* by the arena_array.
-        explicit arena_array(memory::arena* p_arena)
-            : arena_(p_arena) {
-            if(p_arena == nullptr) { capacity_ = 0; }
-        }
-
-        explicit arena_array(memory::arena_owner ptr)
-            : arena_(std::move(ptr)) {
+        arena_array() {
+            auto result = memory::create_arena(sizeof(T) * ElementCapacity);
+            if(!result) {
+                // I don't like throws, but a bad alloc is *truly*
+                // an exceptional occasion.
+                throw std::bad_alloc();
+            }
+            arena_ = std::move(result.value());
             if(!arena_) { capacity_ = 0; }
         }
 
@@ -42,8 +44,8 @@ namespace stdan::storage {
             }
         }
 
-        std::size_t size() const { return size_; }
-        std::size_t capacity() const { return capacity_; }
+        const std::size_t size()     const { return size_; }
+        const std::size_t capacity() const { return capacity_; }
 
         arena_array(arena_array&& other)                 = delete;
         arena_array(const arena_array& other)            = delete;
