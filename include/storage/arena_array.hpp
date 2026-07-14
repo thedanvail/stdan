@@ -1,16 +1,13 @@
 #pragma once
 
 #include "memory/arena.hpp"
-#include "memory/memory_base.hpp"
 
 #include <cstddef>
-#include <expected>
 #include <functional>
 #include <limits>
 #include <memory>
 #include <new>
 #include <optional>
-#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -24,12 +21,16 @@ namespace stdan::storage {
                 ElementCapacity == 0 || sizeof(T) <= (std::numeric_limits<std::size_t>::max)() / ElementCapacity,
                 "sizeof(T) * ElementCapacity overflows std::size_t"
         );
-        /// Constructor requires the user to handle arena creation
-        /// and passing the dependency in.
-        /// Ownership of the arena is considered to be taken over
-        /// *solely* by the arena_array.
+        static constexpr std::size_t storage_size_ = sizeof(T) * ElementCapacity;
+        static_assert(
+                ElementCapacity == 0 || storage_size_ <= (std::numeric_limits<std::size_t>::max)() - (alignof(T) - 1),
+                "arena_array storage plus alignment padding overflows std::size_t"
+        );
+
         arena_array() {
-            auto result = memory::create_arena(sizeof(T) * ElementCapacity);
+            if constexpr (ElementCapacity == 0) { return; }
+
+            auto result = memory::create_arena(storage_size_ + alignof(T) - 1);
             if(!result) {
                 // I don't like throws, but a bad alloc is *truly*
                 // an exceptional occasion.
@@ -44,8 +45,7 @@ namespace stdan::storage {
                 return;
             }
             if constexpr (!std::is_trivially_destructible_v<T>) {
-                T* first = reinterpret_cast<T*>(arena_->base_ptr);
-                std::destroy(first, first + size_);
+                if(first_) { std::destroy(first_, first_ + size_); }
             }
         }
 
@@ -59,10 +59,10 @@ namespace stdan::storage {
         void reset() {
             if(!arena_) { return; }
             if constexpr (!std::is_trivially_destructible_v<T>) {
-                T* first = reinterpret_cast<T*>(arena_->base_ptr);
-                std::destroy(first, first + size_);
+                if(first_) { std::destroy(first_, first_ + size_); }
             }
             stdan::memory::arena_reset(arena_.get());
+            first_ = nullptr;
             size_ = 0;
         }
 
@@ -75,47 +75,31 @@ namespace stdan::storage {
 
             auto created = memory::arena_construct<T>(arena_.get(), std::forward<Args>(args)...);
             if(!created) { return false; }
+            if(size_ == 0) { first_ = created.value(); }
             ++size_;
             return true;
         }
 
         std::optional<std::reference_wrapper<T>> get(std::size_t idx) {
-            if(!arena_ || idx >= size_) { return {}; }
-            auto ret = __get_offsets(idx);
-            if(!ret) { return {}; }
-            auto [target, _] = ret.value();
-            if(target >= arena_->current_offset) { return {}; }
-            return std::optional(std::ref(*reinterpret_cast<T*>(arena_->base_ptr + target)));
+            if(!first_ || idx >= size_) { return {}; }
+            return std::optional(std::ref(first_[idx]));
         }
 
         std::optional<std::reference_wrapper<const T>> get(std::size_t idx) const {
-            if(!arena_ || idx >= size_) { return {}; }
-            auto ret = __get_offsets(idx);
-            if(!ret) { return {}; }
-            auto [target, _] = ret.value();
-            if(target >= arena_->current_offset) { return {}; }
-            return std::optional(std::cref(*reinterpret_cast<const T*>(arena_->base_ptr + target)));
+            if(!first_ || idx >= size_) { return {}; }
+            return std::optional(std::cref(first_[idx]));
         }
 
         template<typename Func> requires std::is_invocable_v<Func, T*>
         void apply(Func&& f) {
             for(std::size_t i = 0; i < size_; ++i) {
-                T* t = reinterpret_cast<T*>(arena_->base_ptr + (i * sizeof(T)));
-                f(t);
+                f(first_ + i);
             }
         }
 
     private:
-        const inline std::expected<std::tuple<std::size_t, std::size_t>, memory::alloc_error> __get_offsets(std::size_t idx) const {
-            const std::size_t target_offset = idx * sizeof(T);
-            const std::size_t target_end = target_offset + sizeof(T);
-            if(target_end < target_offset || target_end > arena_->reserved_size) {
-                return std::unexpected(memory::alloc_error::OutOfBounds);
-            }
-            return std::make_tuple(target_offset, target_end);
-        }
-
         memory::arena_owner arena_ = nullptr;
+        T* first_ = nullptr;
         std::size_t capacity_ = ElementCapacity;
         std::size_t size_ = 0;
     };

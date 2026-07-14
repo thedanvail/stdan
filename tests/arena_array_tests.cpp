@@ -2,6 +2,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstdint>
+
 namespace {
     struct tracked_value {
         inline static int destructor_calls = 0;
@@ -32,6 +34,19 @@ namespace {
             ++destructor_calls;
             --live_instances;
         }
+    };
+
+    struct alignas(64 * 1024) over_aligned_value {
+        inline static int live_instances = 0;
+
+        explicit over_aligned_value(int initial_value) noexcept
+            : value(initial_value) {
+            ++live_instances;
+        }
+
+        ~over_aligned_value() { --live_instances; }
+
+        int value;
     };
 
     struct arena_array_fixture {
@@ -163,6 +178,66 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
                 REQUIRE(values.get(0).has_value());
                 REQUIRE(values.get(0)->get().value == 99);
                 REQUIRE(tracked_value::live_instances == 1);
+            }
+        }
+    }
+}
+
+SCENARIO_METHOD(arena_array_fixture, "a zero-capacity arena_array remains empty") {
+    GIVEN("an array with zero element capacity") {
+        auto values = make_values<int, 0>();
+
+        WHEN("an element is appended") {
+            const bool appended = values.emplace_back(42);
+
+            THEN("the append is rejected and no arena storage is needed") {
+                REQUIRE_FALSE(appended);
+                REQUIRE(values.capacity() == 0);
+                REQUIRE(values.size() == 0);
+                REQUIRE_FALSE(values.get(0).has_value());
+            }
+        }
+    }
+}
+
+SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values") {
+    GIVEN("an array with two over-aligned live values") {
+        over_aligned_value::live_instances = 0;
+        auto values = make_values<over_aligned_value, 2>();
+        REQUIRE(values.emplace_back(7));
+        REQUIRE(values.emplace_back(11));
+        REQUIRE(over_aligned_value::live_instances == 2);
+
+        WHEN("the values are accessed") {
+            auto first = values.get(0);
+            auto second = values.get(1);
+
+            THEN("access uses the aligned address returned by the arena") {
+                REQUIRE(first.has_value());
+                REQUIRE(second.has_value());
+                REQUIRE(reinterpret_cast<std::uintptr_t>(&first->get()) % alignof(over_aligned_value) == 0);
+                REQUIRE(reinterpret_cast<std::uintptr_t>(&second->get()) % alignof(over_aligned_value) == 0);
+                REQUIRE(first->get().value == 7);
+                REQUIRE(second->get().value == 11);
+
+                std::size_t applied = 0;
+                values.apply([&applied](over_aligned_value* value) {
+                    REQUIRE(reinterpret_cast<std::uintptr_t>(value) % alignof(over_aligned_value) == 0);
+                    ++applied;
+                });
+                REQUIRE(applied == 2);
+            }
+        }
+
+        WHEN("the array is reset") {
+            values.reset();
+
+            THEN("the aligned values are destroyed and storage can be reused") {
+                REQUIRE(over_aligned_value::live_instances == 0);
+                REQUIRE(values.size() == 0);
+                REQUIRE(values.emplace_back(99));
+                REQUIRE(values.get(0).has_value());
+                REQUIRE(values.get(0)->get().value == 99);
             }
         }
     }
