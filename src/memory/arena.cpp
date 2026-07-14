@@ -24,7 +24,7 @@ namespace stdan::memory {
         if(p_arena == nullptr) { return {}; }
         bool released;
 #ifdef _WIN32
-        released = VirtualFree(p_arena->base_ptr, 0, MEM_RELEASE) != 0;
+        released = VirtualFree(p_arena->base_ptr, 0, MEM_RELEASE);
 #else
         released = munmap(p_arena->base_ptr, p_arena->reserved_size) == 0;
 #endif

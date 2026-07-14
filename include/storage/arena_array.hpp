@@ -19,6 +19,10 @@ namespace stdan::storage {
     template<typename T, std::size_t ElementCapacity>
     class arena_array {
     public:
+        static_assert(
+                ElementCapacity == 0 || sizeof(T) <= (std::numeric_limits<std::size_t>::max)() / ElementCapacity,
+                "sizeof(T) * ElementCapacity overflows std::size_t"
+        );
         /// Constructor requires the user to handle arena creation
         /// and passing the dependency in.
         /// Ownership of the arena is considered to be taken over

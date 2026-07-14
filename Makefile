@@ -11,8 +11,8 @@ CLANG_TIDY        ?= clang-tidy
 all: build
 
 configure:
-	cmake -S . -B "$(BUILD_DIR)" "-DCMAKE_BUILD_TYPE=$(BUILD_TYPE)" \
-		"-DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS)" $(CMAKE_ARGS)
+	cmake -S . -B "$(BUILD_DIR)" $(CMAKE_ARGS) \
+		"-DCMAKE_BUILD_TYPE=$(BUILD_TYPE)" "-DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS)"
 
 build: configure
 	cmake --build "$(BUILD_DIR)" --parallel "$(JOBS)"
