@@ -1,7 +1,8 @@
-#include "memory/arena.hpp"
 #include "storage/arena_array.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <cstdint>
 
 namespace {
     struct tracked_value {
@@ -35,17 +36,24 @@ namespace {
         }
     };
 
-    struct arena_array_fixture {
-        static stdan::memory::arena* require_arena(std::size_t reserve_size = 4096) {
-            auto result = stdan::memory::create_arena(reserve_size);
-            REQUIRE(result.has_value());
-            return result.value();
+    struct alignas(64 * 1024) over_aligned_value {
+        inline static int live_instances = 0;
+
+        explicit over_aligned_value(int initial_value) noexcept
+            : value(initial_value) {
+            ++live_instances;
         }
 
+        ~over_aligned_value() { --live_instances; }
+
+        int value;
+    };
+
+    struct arena_array_fixture {
         template<typename T, std::size_t ElementCapacity>
-            stdan::storage::arena_array<T, ElementCapacity> make_values(std::size_t reserve_size = 4096) {
-                return stdan::storage::arena_array<T, ElementCapacity>(require_arena(reserve_size));
-            }
+        stdan::storage::arena_array<T, ElementCapacity> make_values() {
+            return stdan::storage::arena_array<T, ElementCapacity>();
+        }
     };
 } // namespace
 
@@ -56,26 +64,6 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array is created with a valid are
         THEN("it starts empty and reports its configured capacity") {
             REQUIRE(values.size() == 0);
             REQUIRE(values.capacity() == 3);
-        }
-    }
-}
-
-SCENARIO_METHOD(arena_array_fixture, "an arena_array is created with a null arena") {
-    GIVEN("a null arena pointer") {
-        stdan::storage::arena_array<int, 3> values(static_cast<stdan::memory::arena*>(nullptr));
-
-        THEN("the array reports zero capacity and stays empty") {
-            REQUIRE(values.size() == 0);
-            REQUIRE(values.capacity() == 0);
-        }
-
-        WHEN("an element is appended") {
-            values.emplace_back(42);
-
-            THEN("the append is ignored") {
-                REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(values.get(0).has_value());
-            }
         }
     }
 }
@@ -129,7 +117,7 @@ SCENARIO_METHOD(arena_array_fixture, "appending past capacity") {
 }
 
 SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
-    GIVEN("an integer array with live elements") {
+    GIVEN("an array with live elements") {
         auto values = make_values<int, 3>();
         values.emplace_back(7);
         values.emplace_back(11);
@@ -195,12 +183,73 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
     }
 }
 
+SCENARIO_METHOD(arena_array_fixture, "a zero-capacity arena_array remains empty") {
+    GIVEN("an array with zero element capacity") {
+        auto values = make_values<int, 0>();
+
+        WHEN("an element is appended") {
+            const bool appended = values.emplace_back(42);
+
+            THEN("the append is rejected and no arena storage is needed") {
+                REQUIRE_FALSE(appended);
+                REQUIRE(values.capacity() == 0);
+                REQUIRE(values.size() == 0);
+                REQUIRE_FALSE(values.get(0).has_value());
+            }
+        }
+    }
+}
+
+SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values") {
+    GIVEN("an array with two over-aligned live values") {
+        over_aligned_value::live_instances = 0;
+        auto values = make_values<over_aligned_value, 2>();
+        REQUIRE(values.emplace_back(7));
+        REQUIRE(values.emplace_back(11));
+        REQUIRE(over_aligned_value::live_instances == 2);
+
+        WHEN("the values are accessed") {
+            auto first = values.get(0);
+            auto second = values.get(1);
+
+            THEN("access uses the aligned address returned by the arena") {
+                REQUIRE(first.has_value());
+                REQUIRE(second.has_value());
+                REQUIRE(reinterpret_cast<std::uintptr_t>(&first->get()) % alignof(over_aligned_value) == 0);
+                REQUIRE(reinterpret_cast<std::uintptr_t>(&second->get()) % alignof(over_aligned_value) == 0);
+                REQUIRE(first->get().value == 7);
+                REQUIRE(second->get().value == 11);
+
+                std::size_t applied = 0;
+                values.apply([&applied](over_aligned_value* value) {
+                    REQUIRE(reinterpret_cast<std::uintptr_t>(value) % alignof(over_aligned_value) == 0);
+                    ++applied;
+                });
+                REQUIRE(applied == 2);
+            }
+        }
+
+        WHEN("the array is reset") {
+            values.reset();
+
+            THEN("the aligned values are destroyed and storage can be reused") {
+                REQUIRE(over_aligned_value::live_instances == 0);
+                REQUIRE(values.size() == 0);
+                REQUIRE(values.emplace_back(99));
+                REQUIRE(values.get(0).has_value());
+                REQUIRE(values.get(0)->get().value == 99);
+            }
+        }
+    }
+}
+
 SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values is destroyed") {
     GIVEN("a tracked type with two live instances") {
         tracked_value::destructor_calls = 0;
         tracked_value::live_instances = 0;
 
-        WHEN("the array goes out of scope") { {
+        WHEN("the array goes out of scope") {
+            {
                 auto values = make_values<tracked_value, 4>();
                 values.emplace_back(tracked_value{7});
                 values.emplace_back(tracked_value{11});
@@ -212,7 +261,6 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array holding non-trivial values 
 
             THEN("the live elements are destroyed") {
                 REQUIRE(tracked_value::destructor_calls == 2);
-                REQUIRE(tracked_value::destructor_calls >= 2);
                 REQUIRE(tracked_value::live_instances == 0);
             }
         }

@@ -1,62 +1,48 @@
-BUILD_DIR         := build
+BUILD_ROOT        ?= build
 BUILD_TYPE        ?= Debug
 STDAN_BUILD_TESTS ?= OFF
-CC                ?= clang
-CXX               ?= clang++
+BUILD_DIR         ?= $(BUILD_ROOT)/$(BUILD_TYPE)-tests-$(STDAN_BUILD_TESTS)
 JOBS              ?= $(shell nproc 2>/dev/null || echo 4)
-CLANG_TIDY        ?= clang-tidy
-CPPCHECK          ?= cppcheck
-JQ                ?= jq
 CMAKE_ARGS        ?=
-CONFIGURE_ARGS    := -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) -DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS) $(CMAKE_ARGS)
+CLANG_TIDY        ?= clang-tidy
 
-.PHONY: all configure build release test format clean compile_commands cc tidy cppcheck ci
-
+.PHONY: all configure build release test format cc tidy cppcheck clean
 
 all: build
 
 configure:
-	if printf '%s\n' "$(notdir $(CXX))" | grep -Eq '^clang\+\+'; then \
-		CC="$(CC)" CXX="$(CXX)" cmake -B $(BUILD_DIR) $(CONFIGURE_ARGS) -DSTDAN_USE_LIBCXX=ON; \
-	else \
-		CC="$(CC)" CXX="$(CXX)" cmake -B $(BUILD_DIR) $(CONFIGURE_ARGS); \
-	fi
-	@ln -sf $(BUILD_DIR)/compile_commands.json compile_commands.json
+	cmake -S . -B "$(BUILD_DIR)" $(CMAKE_ARGS) \
+		"-DCMAKE_BUILD_TYPE=$(BUILD_TYPE)" "-DSTDAN_BUILD_TESTS=$(STDAN_BUILD_TESTS)"
 
-build: | configure
-	cmake --build $(BUILD_DIR) -j$(JOBS)
+build: configure
+	cmake --build "$(BUILD_DIR)" --parallel "$(JOBS)"
 
 release:
 	$(MAKE) build BUILD_TYPE=Release
 
-test:
-	$(MAKE) configure STDAN_BUILD_TESTS=ON
-	cmake --build $(BUILD_DIR) --target stdan_tests -j$(JOBS)
-	ctest --test-dir $(BUILD_DIR) --output-on-failure
+test: STDAN_BUILD_TESTS := ON
+test: configure
+	cmake --build "$(BUILD_DIR)" --target stdan_tests --parallel "$(JOBS)"
+	ctest --test-dir "$(BUILD_DIR)" --output-on-failure
 
 format:
-	find src include tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) | xargs clang-format -i
+	find src include tests -type f \( -name '*.cpp' -o -name '*.hpp' -o -name '*.h' \) \
+		-exec clang-format -i {} +
 
-fmt: format
-
-cc:
-	$(MAKE) configure STDAN_BUILD_TESTS=ON
-	@echo "compile_commands.json symlinked to project root"
+cc: STDAN_BUILD_TESTS := ON
+cc: configure
+	ln -sf "$(BUILD_DIR)/compile_commands.json" compile_commands.json
 
 tidy: cc
-	$(JQ) -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$$"))' compile_commands.json \
+	jq -r '.[] | .file | select(contains("/vendor/") | not) | select(test("\\.(cpp|cc|cxx)$$"))' compile_commands.json \
 		| sort -u \
-		| xargs -r $(CLANG_TIDY) -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
+		| xargs $(CLANG_TIDY) -p . --checks='-*,clang-analyzer-*' --warnings-as-errors=*
 
 cppcheck:
-	$(CPPCHECK) --enable=all --suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction --error-exitcode=1 -i vendor -i build src include
-
-ci:
-	$(MAKE) clean
-	$(MAKE) cc
-	$(MAKE) tidy
-	$(MAKE) cppcheck
-	$(MAKE) test
+	cppcheck --enable=all --std=c++23 -I include \
+		--suppress=missingInclude --suppress=missingIncludeSystem --suppress=unusedFunction \
+		--suppress=unmatchedSuppression --suppress=normalCheckLevelMaxBranches \
+		--error-exitcode=1 -i vendor -i "$(BUILD_DIR)" src include
 
 clean:
-	rm -rf $(BUILD_DIR) compile_commands.json
+	rm -rf "$(BUILD_ROOT)" "$(BUILD_DIR)" compile_commands.json
