@@ -14,9 +14,6 @@
 
 namespace stdan::storage {
 
-template <typename T>
-concept valid_type = std::is_default_constructible_v<T> && std::is_move_constructible_v<T>;
-
 /// A pop-swap vector.
 /// Saves a lot of space/speed by omitting the actual deletion of T
 /// instances and only considering up to the last valid instance
@@ -30,7 +27,7 @@ concept valid_type = std::is_default_constructible_v<T> && std::is_move_construc
 /// a short-lived x-value for safety purposes.
 /// Your other solid option is to filter out any elements you do not
 /// need and then run an operation on that.
-template<valid_type T>
+template<typename T> requires std::is_default_constructible_v<T> && std::is_move_constructible_v<T>
 class ps_vector {
 public:
     // if your T is hella expensive to construct, this is perfect;
@@ -41,7 +38,7 @@ public:
     ps_vector(std::size_t aCapacity)
         : m_capacity(aCapacity)
         , m_firstAvailableEntry(0) {
-        m_data.reserve(aCapacity);
+        data_.reserve(aCapacity);
     }
 
     ~ps_vector()                                  = default;
@@ -51,19 +48,19 @@ public:
     ps_vector& operator=(const ps_vector& aOther) = default;
 
 private:
-    std::vector<T> m_data;
+    std::vector<T> data_;
     std::size_t m_capacity;
     std::size_t m_firstAvailableEntry;
 
 public:
 
     // Iterator stuff for loop support
-    auto begin() noexcept { return m_data.begin(); }
-    auto begin() const noexcept { return m_data.cbegin(); }
-    auto cbegin() const noexcept { return m_data.cbegin(); }
-    auto end() noexcept { return m_data.begin() + m_firstAvailableEntry; }
-    auto end() const noexcept { return m_data.cbegin() + m_firstAvailableEntry; }
-    auto cend() const noexcept { return m_data.cbegin() + m_firstAvailableEntry; }
+    auto begin() noexcept { return data_.begin(); }
+    auto begin() const noexcept { return data_.cbegin(); }
+    auto cbegin() const noexcept { return data_.cbegin(); }
+    auto end() noexcept { return data_.begin() + m_firstAvailableEntry; }
+    auto end() const noexcept { return data_.cbegin() + m_firstAvailableEntry; }
+    auto cend() const noexcept { return data_.cbegin() + m_firstAvailableEntry; }
 
     bool empty() const { return m_firstAvailableEntry == 0; }
     bool full() const { return m_firstAvailableEntry == m_capacity; }
@@ -75,42 +72,42 @@ public:
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
 #endif
-        return m_data[idx];
+        return data_[idx];
     }
 
     [[nodiscard]] const T& operator[](std::size_t idx) const {
 #ifdef STDAN_DEBUG
         assert(idx < m_firstAvailableEntry);
 #endif
-        return m_data[idx];
+        return data_[idx];
     }
 
     void resize(std::size_t aNewSize) requires std::default_initializable<T> {
-        m_data.resize(aNewSize);
+        data_.resize(aNewSize);
         m_firstAvailableEntry = aNewSize;
     }
 
-    [[nodiscard]] std::expected<std::size_t, ErrorCode> index_of(const T& t) const requires std::equality_comparable<T> {
-        auto it = std::find(m_data.begin(), m_data.begin() + m_firstAvailableEntry, t);
-        if(it != m_data.begin() + m_firstAvailableEntry) {
-            return static_cast<std::size_t>(std::distance(m_data.begin(), it));
+    [[nodiscard]] std::expected<std::size_t, error_code> index_of(const T& t) const requires std::equality_comparable<T> {
+        auto it = std::find(data_.begin(), data_.begin() + m_firstAvailableEntry, t);
+        if(it != data_.begin() + m_firstAvailableEntry) {
+            return static_cast<std::size_t>(std::distance(data_.begin(), it));
         }
-        return std::unexpected(ErrorCode::ItemNotFound);
+        return std::unexpected(error_code::ItemNotFound);
     }
 
     void append(T&& t) {
         if(full()) [[unlikely]] { return; }
 
-        if (m_firstAvailableEntry < m_data.size()) [[likely]] { m_data[m_firstAvailableEntry] = std::move(t); }
-        else { m_data.emplace_back(std::move(t)); }
+        if (m_firstAvailableEntry < data_.size()) [[likely]] { data_[m_firstAvailableEntry] = std::move(t); }
+        else { data_.emplace_back(std::move(t)); }
         ++m_firstAvailableEntry;
     }
 
     void append(const T& t) requires std::is_copy_constructible_v<T> {
         if(full()) [[unlikely]] { return; }
 
-        if(m_firstAvailableEntry < m_data.size()) { m_data[m_firstAvailableEntry] = t; }
-        else { m_data.emplace_back(t); }
+        if(m_firstAvailableEntry < data_.size()) { data_[m_firstAvailableEntry] = t; }
+        else { data_.emplace_back(t); }
         ++m_firstAvailableEntry;
     }
 
@@ -125,7 +122,7 @@ public:
         --m_firstAvailableEntry;
         if(idx != m_firstAvailableEntry) {
             // Use move assignment instead of swap to save 2 operations
-            m_data[idx] = std::move(m_data[m_firstAvailableEntry]);
+            data_[idx] = std::move(data_[m_firstAvailableEntry]);
         }
     }
 
@@ -133,8 +130,8 @@ public:
     void destroy(std::size_t idx) requires std::is_nothrow_destructible_v<T> && std::is_nothrow_move_constructible_v<T> {
         if(idx >= m_firstAvailableEntry) [[unlikely]] { return; }
         if(idx != --m_firstAvailableEntry) {
-            std::destroy_at(std::addressof(m_data[idx]));
-            std::construct_at(std::addressof(m_data[idx]), std::move(m_data[m_firstAvailableEntry]));
+            std::destroy_at(std::addressof(data_[idx]));
+            std::construct_at(std::addressof(data_[idx]), std::move(data_[m_firstAvailableEntry]));
         }
     }
 
@@ -144,9 +141,9 @@ public:
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
-    [[nodiscard]] std::expected<const T*, ErrorCode> get(std::size_t idx) const {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::IndexOutOfBounds); }
-        return &m_data[idx];
+    [[nodiscard]] std::expected<const T*, error_code> get(std::size_t idx) const {
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(error_code::IndexOutOfBounds); }
+        return &data_[idx];
     }
 
     /// Retrieves the pointer to a mutable reference for the element at the index.
@@ -155,9 +152,9 @@ public:
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
-    [[nodiscard]] std::expected<T*, ErrorCode> get(std::size_t idx) {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(ErrorCode::IndexOutOfBounds); }
-        return &m_data[idx];
+    [[nodiscard]] std::expected<T*, error_code> get(std::size_t idx) {
+        if(idx >= m_firstAvailableEntry) { return std::unexpected(error_code::IndexOutOfBounds); }
+        return &data_[idx];
     }
 
     // We need one for const ps_vectors and one for non-const.
@@ -166,8 +163,8 @@ public:
     void for_each(ExecutionPolicy&& policy, F&& aFunc) {
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
-              m_data.begin(),
-              m_data.begin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
+              data_.begin(),
+              data_.begin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
               [&aFunc](T& data) { aFunc(data); }
         );
     }
@@ -178,8 +175,8 @@ public:
     void for_each(ExecutionPolicy&& policy, F&& aFunc) const {
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
-              m_data.cbegin(),
-              m_data.cbegin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
+              data_.cbegin(),
+              data_.cbegin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
               [&aFunc](const T& data) { aFunc(data); }
         );
     }
