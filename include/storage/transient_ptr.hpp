@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <concepts>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -12,6 +13,7 @@ namespace stdan::storage {
 template<class T>
 class [[nodiscard]] transient_ptr {
 public:
+    transient_ptr() noexcept = default;
     explicit transient_ptr(T* ptr) noexcept
         : ptr_(ptr){}
 
@@ -30,8 +32,16 @@ public:
     ~transient_ptr() = default;
 
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
-
     friend bool operator==(const transient_ptr& lhs, std::nullptr_t) noexcept { return lhs.ptr_ == nullptr; }
+    friend bool operator==(const transient_ptr& lhs, T rhs) noexcept {
+        if(lhs.ptr_ == nullptr) { return false; }
+        return *lhs.ptr_ == rhs;
+    }
+    
+    bool equals(const T& t) const requires std::equality_comparable<T> {
+        if(ptr_ == nullptr) { return false; }
+        return *ptr_ == t;
+    }
 
     T& operator*() & = delete;
     T* operator->() & = delete;
@@ -97,6 +107,6 @@ public:
     }
 
 private:
-    T* ptr_;
+    T* ptr_ = nullptr;
 };
 }

@@ -3,6 +3,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <utility>
 
 namespace {
     struct tracked_value {
@@ -49,12 +50,20 @@ namespace {
         int value;
     };
 
+    template<typename Ptr>
+    auto ptr_or_null(Ptr ptr) {
+        using result_type = decltype(std::move(ptr).apply([](auto* candidate) { return candidate; }));
+        if(!ptr) { return static_cast<result_type>(nullptr); }
+        return std::move(ptr).apply([](auto* candidate) { return candidate; });
+    }
+
     struct arena_array_fixture {
         template<typename T, std::size_t ElementCapacity>
         stdan::storage::arena_array<T, ElementCapacity> make_values() {
             return stdan::storage::arena_array<T, ElementCapacity>();
         }
     };
+
 } // namespace
 
 SCENARIO_METHOD(arena_array_fixture, "an arena_array is created with a valid arena") {
@@ -78,10 +87,10 @@ SCENARIO_METHOD(arena_array_fixture, "values are appended to an arena_array") {
 
             THEN("the size grows and the values can be retrieved in order") {
                 REQUIRE(values.size() == 2);
-                REQUIRE(values.get(0).has_value());
-                REQUIRE(values.get(1).has_value());
-                REQUIRE(values.get(0)->get() == 7);
-                REQUIRE(values.get(1)->get() == 11);
+                REQUIRE(values.get(0) != nullptr);
+                REQUIRE(values.get(1) != nullptr);
+                REQUIRE(values.get(0) == 7);
+                REQUIRE(values.get(1) == 11);
             }
         }
 
@@ -90,7 +99,7 @@ SCENARIO_METHOD(arena_array_fixture, "values are appended to an arena_array") {
 
             THEN("the lookup reports that no live value exists there") {
                 REQUIRE(values.size() == 1);
-                REQUIRE_FALSE(values.get(1).has_value());
+                REQUIRE(ptr_or_null(values.get(1)) == nullptr);
             }
         }
     }
@@ -107,10 +116,12 @@ SCENARIO_METHOD(arena_array_fixture, "appending past capacity") {
 
             THEN("the array remains unchanged") {
                 REQUIRE(values.size() == 2);
-                REQUIRE(values.get(0).has_value());
-                REQUIRE(values.get(1).has_value());
-                REQUIRE(values.get(0)->get() == 7);
-                REQUIRE(values.get(1)->get() == 11);
+                int* first = ptr_or_null(values.get(0));
+                int* second = ptr_or_null(values.get(1));
+                REQUIRE(first != nullptr);
+                REQUIRE(second != nullptr);
+                REQUIRE(*first == 7);
+                REQUIRE(*second == 11);
             }
         }
     }
@@ -127,16 +138,17 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
 
             THEN("it becomes empty") {
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(values.get(0).has_value());
-                REQUIRE_FALSE(values.get(1).has_value());
+                REQUIRE(ptr_or_null(values.get(0)) == nullptr);
+                REQUIRE(ptr_or_null(values.get(1)) == nullptr);
             }
 
             THEN("new values can be written from the beginning again") {
                 values.emplace_back(99);
 
                 REQUIRE(values.size() == 1);
-                REQUIRE(values.get(0).has_value());
-                REQUIRE(values.get(0)->get() == 99);
+                int* first = ptr_or_null(values.get(0));
+                REQUIRE(first != nullptr);
+                REQUIRE(*first == 99);
             }
         }
     }
@@ -149,12 +161,12 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
         values.emplace_back(tracked_value{7});
         values.emplace_back(tracked_value{11});
 
-        auto first = values.get(0);
-        auto second = values.get(1);
-        REQUIRE(first.has_value());
-        REQUIRE(second.has_value());
-        REQUIRE(first->get().value == 7);
-        REQUIRE(second->get().value == 11);
+        tracked_value* first = ptr_or_null(values.get(0));
+        tracked_value* second = ptr_or_null(values.get(1));
+        REQUIRE(first != nullptr);
+        REQUIRE(second != nullptr);
+        REQUIRE(first->value == 7);
+        REQUIRE(second->value == 11);
         REQUIRE(values.size() == 2);
         REQUIRE(tracked_value::live_instances == 2);
 
@@ -167,16 +179,17 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
                 REQUIRE(tracked_value::destructor_calls == destructor_calls_before_reset + 2);
                 REQUIRE(tracked_value::live_instances == 0);
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(values.get(0).has_value());
-                REQUIRE_FALSE(values.get(1).has_value());
+                REQUIRE(ptr_or_null(values.get(0)) == nullptr);
+                REQUIRE(ptr_or_null(values.get(1)) == nullptr);
             }
 
             THEN("the array storage can be reused from the beginning") {
                 values.emplace_back(tracked_value{99});
 
                 REQUIRE(values.size() == 1);
-                REQUIRE(values.get(0).has_value());
-                REQUIRE(values.get(0)->get().value == 99);
+                tracked_value* first_again = ptr_or_null(values.get(0));
+                REQUIRE(first_again != nullptr);
+                REQUIRE(first_again->value == 99);
                 REQUIRE(tracked_value::live_instances == 1);
             }
         }
@@ -194,7 +207,7 @@ SCENARIO_METHOD(arena_array_fixture, "a zero-capacity arena_array remains empty"
                 REQUIRE_FALSE(appended);
                 REQUIRE(values.capacity() == 0);
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(values.get(0).has_value());
+                REQUIRE(ptr_or_null(values.get(0)) == nullptr);
             }
         }
     }
@@ -209,16 +222,16 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values"
         REQUIRE(over_aligned_value::live_instances == 2);
 
         WHEN("the values are accessed") {
-            auto first = values.get(0);
-            auto second = values.get(1);
+            auto* first = ptr_or_null(values.get(0));
+            auto* second = ptr_or_null(values.get(1));
 
             THEN("access uses the aligned address returned by the arena") {
-                REQUIRE(first.has_value());
-                REQUIRE(second.has_value());
-                REQUIRE(reinterpret_cast<std::uintptr_t>(&first->get()) % alignof(over_aligned_value) == 0);
-                REQUIRE(reinterpret_cast<std::uintptr_t>(&second->get()) % alignof(over_aligned_value) == 0);
-                REQUIRE(first->get().value == 7);
-                REQUIRE(second->get().value == 11);
+                REQUIRE(first != nullptr);
+                REQUIRE(second != nullptr);
+                REQUIRE(reinterpret_cast<std::uintptr_t>(first) % alignof(over_aligned_value) == 0);
+                REQUIRE(reinterpret_cast<std::uintptr_t>(second) % alignof(over_aligned_value) == 0);
+                REQUIRE(first->value == 7);
+                REQUIRE(second->value == 11);
 
                 std::size_t applied = 0;
                 values.apply([&applied](over_aligned_value* value) {
@@ -236,8 +249,9 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values"
                 REQUIRE(over_aligned_value::live_instances == 0);
                 REQUIRE(values.size() == 0);
                 REQUIRE(values.emplace_back(99));
-                REQUIRE(values.get(0).has_value());
-                REQUIRE(values.get(0)->get().value == 99);
+                auto* first = ptr_or_null(values.get(0));
+                REQUIRE(first != nullptr);
+                REQUIRE(first->value == 99);
             }
         }
     }

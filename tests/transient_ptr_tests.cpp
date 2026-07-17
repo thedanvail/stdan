@@ -13,6 +13,7 @@ struct item {
 };
 
 using item_ptr = stdan::storage::transient_ptr<item>;
+using const_item_ptr = stdan::storage::transient_ptr<const item>;
 
 static_assert(!std::is_copy_constructible_v<item_ptr>);
 static_assert(!std::is_copy_assignable_v<item_ptr>);
@@ -29,8 +30,8 @@ SCENARIO("a transient pointer is created from an object") {
         THEN("both pointers report that they contain an object") {
             REQUIRE(static_cast<bool>(from_pointer));
             REQUIRE(static_cast<bool>(from_reference));
-            REQUIRE_FALSE(from_pointer == nullptr);
-            REQUIRE_FALSE(from_reference == nullptr);
+            REQUIRE(from_pointer != nullptr);
+            REQUIRE(from_reference != nullptr);
         }
     }
 }
@@ -55,7 +56,8 @@ SCENARIO("a transient pointer is null") {
 
         WHEN("apply_if_non_null is invoked") {
             bool invoked = false;
-            const bool applied = static_cast<item_ptr&&>(pointer).apply_if_non_null([&invoked](item&) { invoked = true; });
+            const bool applied = static_cast<item_ptr&&>(pointer)
+                    .apply_if_non_null([&invoked](item&) { invoked = true; });
 
             THEN("the callback is skipped") {
                 REQUIRE_FALSE(applied);
@@ -113,10 +115,11 @@ SCENARIO("a transient pointer is consumed through callbacks") {
         item_ptr pointer{value};
 
         WHEN("apply_non_null is invoked") {
-            const int result = static_cast<item_ptr&&>(pointer).apply_non_null([](item& candidate) {
-                candidate.value = 13;
-                return candidate.value;
-            });
+            const int result = static_cast<item_ptr&&>(pointer)
+                    .apply_non_null([](item& candidate) {
+                        candidate.value = 13;
+                        return candidate.value;
+                    });
 
             THEN("the callback receives the object and its result is returned") {
                 REQUIRE(result == 13);
@@ -131,10 +134,11 @@ SCENARIO("a transient pointer is consumed through callbacks") {
 
         WHEN("apply_if_non_null is invoked") {
             bool invoked = false;
-            const bool applied = static_cast<item_ptr&&>(pointer).apply_if_non_null([&invoked](item& candidate) {
-                invoked = true;
-                candidate.value = 17;
-            });
+            const bool applied = static_cast<item_ptr&&>(pointer)
+                    .apply_if_non_null([&invoked](item& candidate) {
+                        invoked = true;
+                        candidate.value = 17;
+                    });
 
             THEN("the callback runs and success is reported") {
                 REQUIRE(applied);
@@ -148,12 +152,11 @@ SCENARIO("a transient pointer is consumed through callbacks") {
 SCENARIO("a transient pointer provides const access") {
     GIVEN("a transient pointer to a const object") {
         const item value{23};
-        stdan::storage::transient_ptr<const item> pointer{value};
+        const_item_ptr pointer{value};
 
         WHEN("apply_non_null is invoked") {
-            const int observed = static_cast<stdan::storage::transient_ptr<const item>&&>(pointer).apply_non_null([](const item& candidate) {
-                return candidate.value;
-            });
+            const int observed = static_cast<const_item_ptr&&>(pointer)
+                    .apply_non_null([](const item& candidate) { return candidate.value; });
 
             THEN("the callback can read the object") {
                 REQUIRE(observed == 23);

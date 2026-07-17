@@ -1,6 +1,7 @@
 #pragma once
 
 #include "memory/arena.hpp"
+#include "storage/transient_ptr.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -80,14 +81,14 @@ namespace stdan::storage {
             return true;
         }
 
-        std::optional<std::reference_wrapper<T>> get(std::size_t idx) {
+        transient_ptr<T> get(std::size_t idx) {
             if(!first_ || idx >= size_) { return {}; }
-            return std::optional(std::ref(first_[idx]));
+            return transient_ptr<T>(&first_[idx]);
         }
 
-        std::optional<std::reference_wrapper<const T>> get(std::size_t idx) const {
+        transient_ptr<T> get(std::size_t idx) const {
             if(!first_ || idx >= size_) { return {}; }
-            return std::optional(std::cref(first_[idx]));
+            return transient_ptr<T>(&first_[idx]);
         }
 
         template<typename Func> requires std::is_invocable_v<Func, T*>

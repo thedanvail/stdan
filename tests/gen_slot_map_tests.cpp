@@ -3,11 +3,22 @@
 #include "storage/gen_slot_map.hpp"
 
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <stdexcept>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
 namespace {
 using int_map = stdan::storage::generational_slot_map<int>;
+
+static_assert(std::forward_iterator<int_map::iterator>);
+static_assert(std::forward_iterator<int_map::const_iterator>);
+static_assert(std::is_same_v<std::iter_reference_t<int_map::iterator>, int&>);
+static_assert(std::is_same_v<std::iter_reference_t<int_map::const_iterator>, const int&>);
+static_assert(std::is_constructible_v<int_map::const_iterator, int_map::iterator>);
+static_assert(!std::is_constructible_v<int_map::iterator, int_map::const_iterator>);
 
 struct tracked_value {
     inline static int live = 0;
@@ -69,6 +80,14 @@ struct throwing_copy_value {
 
     throwing_copy_value(throwing_copy_value&&) noexcept = default;
 };
+
+template<typename Ptr>
+auto ptr_or_null(Ptr&& ptr) {
+    using pointer_type = decltype(std::forward<Ptr>(ptr).apply([](auto* candidate) { return candidate; }));
+    if(!ptr) { return pointer_type{nullptr}; }
+    return std::forward<Ptr>(ptr).apply([](auto* candidate) { return candidate; });
+}
+
 } // namespace
 
 SCENARIO("a generational slot map is newly created") {
@@ -96,7 +115,7 @@ SCENARIO("values are inserted into a generational slot map") {
                 REQUIRE(values.size() == 1);
                 REQUIRE(values.contains(key));
                 REQUIRE(values.get(key) != nullptr);
-                REQUIRE(*values.get(key) == 7);
+                REQUIRE(*ptr_or_null(values.get(key)) == 7);
             }
         }
     }
@@ -106,13 +125,15 @@ SCENARIO("values are inserted into a generational slot map") {
         move_only_value source{11};
 
         WHEN("the value is inserted as an rvalue") {
-            const auto key = values.emplace_back(static_cast<move_only_value&&>(source));
+            const auto key = values.insert(std::move(source));
 
             THEN("ownership is transferred into the map") {
                 REQUIRE(source.value == nullptr);
                 REQUIRE(values.size() == 1);
                 REQUIRE(values.get(key) != nullptr);
-                REQUIRE(*values.get(key)->value == 11);
+                auto* stored = ptr_or_null(values.get(key));
+                REQUIRE(stored != nullptr);
+                REQUIRE(*stored->value == 11);
             }
         }
     }
@@ -125,7 +146,7 @@ SCENARIO("a generational slot map grows beyond its initial allocation") {
 
         WHEN("enough values are inserted to force repeated growth") {
             for(int value = 0; value < 128; ++value) {
-                values.emplace_back(tracked_value{value});
+                values.emplace(tracked_value{value});
             }
 
             THEN("every value remains live and retrievable") {
@@ -186,7 +207,7 @@ SCENARIO("a value is removed from a generational slot map") {
     GIVEN("a map containing a tracked value") {
         tracked_value::reset_counts();
         stdan::storage::generational_slot_map<tracked_value> values;
-        const auto key = values.emplace_back(tracked_value{7});
+        const auto key = values.emplace(tracked_value{7});
         const int destroyed_before_remove = tracked_value::destroyed;
 
         WHEN("the value is removed") {
@@ -213,7 +234,7 @@ SCENARIO("a removed slot is reused") {
                 REQUIRE(current_key.index == stale_key.index);
                 REQUIRE(current_key.generation != stale_key.generation);
                 REQUIRE(values.size() == 1);
-                REQUIRE(*values.get(current_key) == 11);
+                REQUIRE(*ptr_or_null(values.get(current_key)) == 11);
             }
 
             THEN("the stale key cannot access or remove the replacement") {
@@ -247,6 +268,85 @@ SCENARIO("multiple removed slots are reused") {
     }
 }
 
+SCENARIO("a generational slot map is iterated") {
+    GIVEN("an empty map") {
+        int_map values;
+
+        THEN("its iterator range is empty") {
+            REQUIRE(values.begin() == values.end());
+            REQUIRE(values.cbegin() == values.cend());
+        }
+    }
+
+    GIVEN("a map containing active and removed slots") {
+        int_map values;
+        values.insert(10);
+        const auto removed = values.insert(20);
+        values.insert(30);
+        REQUIRE(values.remove(removed));
+
+        WHEN("the map is traversed") {
+            std::vector<int> observed;
+            for(const int& value : values) { observed.push_back(value); }
+
+            THEN("only active values are produced in slot order") {
+                REQUIRE(observed == std::vector<int>{10, 30});
+            }
+        }
+
+        WHEN("every active value is modified through an iterator") {
+            for(int& value : values) { value *= 2; }
+
+            THEN("the stored values are modified") {
+                std::vector<int> observed;
+                for(const int& value : values) { observed.push_back(value); }
+                REQUIRE(observed == std::vector<int>{20, 60});
+            }
+        }
+    }
+
+    GIVEN("a map whose first and last physical slots are inactive") {
+        int_map values;
+        const auto first = values.insert(1);
+        values.insert(2);
+        const auto last = values.insert(3);
+        REQUIRE(values.remove(first));
+        REQUIRE(values.remove(last));
+
+        WHEN("prefix and postfix increment are used") {
+            auto current = values.begin();
+            auto previous = current++;
+
+            THEN("begin skips the leading hole and increment reaches the end") {
+                REQUIRE(*previous == 2);
+                REQUIRE(current == values.end());
+            }
+        }
+    }
+
+    GIVEN("a const map view containing active values") {
+        int_map values;
+        values.insert(5);
+        values.insert(8);
+        const int_map& const_values = values;
+
+        WHEN("the const range is traversed") {
+            std::vector<int> observed;
+            for(const int& value : const_values) { observed.push_back(value); }
+
+            THEN("all active values are readable") {
+                int_map::const_iterator converted = values.begin();
+                REQUIRE(observed == std::vector<int>{5, 8});
+                REQUIRE(converted == const_values.begin());
+                REQUIRE(values.begin() == const_values.begin());
+                REQUIRE(const_values.begin() == values.begin());
+                REQUIRE(const_values.begin() == const_values.cbegin());
+                REQUIRE(const_values.end() == const_values.cend());
+            }
+        }
+    }
+}
+
 SCENARIO("a generational slot map is accessed through const qualification") {
     GIVEN("a const view of a map containing a value") {
         int_map values;
@@ -258,8 +358,9 @@ SCENARIO("a generational slot map is accessed through const qualification") {
 
             THEN("a readable const transient pointer is returned") {
                 REQUIRE(pointer != nullptr);
-                const int observed = static_cast<decltype(pointer)&&>(pointer).apply_non_null([](const int& value) { return value; });
-                REQUIRE(observed == 29);
+                auto const_ptr = ptr_or_null(std::move(pointer));
+                REQUIRE(const_ptr != nullptr);
+                REQUIRE(*const_ptr == 29);
             }
         }
     }
@@ -285,8 +386,8 @@ SCENARIO("a generational slot map is cleared") {
     GIVEN("a map containing live and removed values") {
         tracked_value::reset_counts();
         stdan::storage::generational_slot_map<tracked_value> values;
-        const auto first = values.emplace_back(tracked_value{1});
-        values.emplace_back(tracked_value{2});
+        const auto first = values.emplace(tracked_value{1});
+        values.emplace(tracked_value{2});
         REQUIRE(values.remove(first));
         REQUIRE(tracked_value::live == 1);
 
@@ -300,10 +401,11 @@ SCENARIO("a generational slot map is cleared") {
             }
 
             THEN("new insertions work after the clear") {
-                const auto key = values.emplace_back(tracked_value{3});
+                const auto key = values.emplace(tracked_value{3});
                 REQUIRE(values.size() == 1);
-                REQUIRE(values.get(key) != nullptr);
-                REQUIRE(values.get(key)->value == 3);
+                auto* stored = ptr_or_null(values.get(key));
+                REQUIRE(stored != nullptr);
+                REQUIRE(stored->value == 3);
             }
         }
     }
@@ -312,7 +414,7 @@ SCENARIO("a generational slot map is cleared") {
 SCENARIO("value construction throws during insertion") {
     GIVEN("a map with a reusable free slot") {
         stdan::storage::generational_slot_map<throwing_copy_value> values;
-        const auto removed = values.emplace_back(throwing_copy_value{1});
+        const auto removed = values.emplace(throwing_copy_value{1});
         REQUIRE(values.remove(removed));
         throwing_copy_value source{2};
         throwing_copy_value::throw_on_copy = true;
@@ -342,8 +444,8 @@ SCENARIO("a generational slot map is destroyed") {
         WHEN("the map leaves scope") {
             {
                 stdan::storage::generational_slot_map<tracked_value> values;
-                values.emplace_back(tracked_value{1});
-                values.emplace_back(tracked_value{2});
+                values.emplace(tracked_value{1});
+                values.emplace(tracked_value{2});
                 REQUIRE(tracked_value::live == 2);
             }
 
