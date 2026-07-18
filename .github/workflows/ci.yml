@@ -1,4 +1,4 @@
-name: Static Analysis
+name: CI
 
 on:
   pull_request:
@@ -15,11 +15,11 @@ env:
   LLVM_VERSION: 22
 
 jobs:
-  analyze:
+  linux:
     runs-on: ubuntu-24.04
     env:
-      CC: gcc
-      CXX: g++
+      CC: gcc-14
+      CXX: g++-14
     steps:
       - name: Checkout Code
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -27,11 +27,11 @@ jobs:
           submodules: recursive
           persist-credentials: false
 
-      - name: Install LLVM ${{ env.LLVM_VERSION }} toolchain
+      - name: Install toolchains
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y ca-certificates curl gnupg cppcheck jq
+          sudo apt-get install -y ca-certificates curl gnupg cppcheck jq g++-14
           curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
             | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
           . /etc/os-release
@@ -43,8 +43,8 @@ jobs:
 
       - name: Show toolchain versions
         run: |
-          gcc --version
-          g++ --version
+          gcc-14 --version
+          g++-14 --version
           cmake --version
           "clang-tidy-$LLVM_VERSION" --version
 
@@ -61,3 +61,35 @@ jobs:
 
       - name: Run tests
         run: make test
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Show toolchain versions
+        shell: pwsh
+        run: |
+          cmake --version
+          & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationVersion
+
+      - name: Configure
+        shell: pwsh
+        run: |
+          cmake -S . -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DSTDAN_BUILD_TESTS=ON
+
+      - name: Build tests
+        shell: pwsh
+        run: cmake --build build --config Debug --target stdan_tests --parallel
+
+      - name: Run tests
+        shell: pwsh
+        run: ctest --test-dir build -C Debug --output-on-failure

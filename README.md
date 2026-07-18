@@ -14,8 +14,11 @@ The repository is organized to grow over time. New implementations, tests, and s
 ## Requirements
 
 - CMake 3.20 or newer
-- A C++23-capable compiler
-- `make` for the provided Makefile workflow (windows people can deal - they're on windows after all)
+- A C++23-capable compiler with support for explicit object parameters ("deducing this"), e.g.:
+  - GCC 14 or newer
+  - Clang 19 or newer
+  - MSVC from Visual Studio 2022 17.8 or newer
+- `make` for the provided Makefile workflow on Unix-like systems (Windows builds use CMake directly)
 
 ## Build
 
@@ -30,6 +33,13 @@ cmake --build build
 
 ```sh
 make build
+```
+
+### On Windows (CMake + Visual Studio)
+
+```sh
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Debug
 ```
 
 ## Tests
