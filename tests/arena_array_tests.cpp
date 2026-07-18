@@ -10,7 +10,6 @@
 
 namespace {
     using test_support::arena_tracked_value;
-
     struct alignas(8192) over_aligned_value {
         inline static int live_instances = 0;
 
