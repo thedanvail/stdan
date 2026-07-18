@@ -7,7 +7,7 @@
 #include <type_traits>
 
 namespace {
-    struct alignas(64 * 1024) over_aligned_value {
+    struct alignas(8192) over_aligned_value {
         explicit over_aligned_value(int initial_value) noexcept
             : value(initial_value) {}
 
