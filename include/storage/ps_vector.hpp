@@ -36,21 +36,21 @@ public:
     // that the construction can all take place at once.
     // You live your life tho
     ps_vector(std::size_t aCapacity)
-        : m_capacity(aCapacity)
-        , m_firstAvailableEntry(0) {
+        : capacity_(aCapacity)
+        , firstAvailableEntry_(0) {
         data_.reserve(aCapacity);
     }
 
-    ~ps_vector()                                  = default;
-    ps_vector(ps_vector&& aOther)                 = default;
-    ps_vector(const ps_vector& aOther)            = default;
-    ps_vector& operator=(ps_vector&& aOther)      = default;
-    ps_vector& operator=(const ps_vector& aOther) = default;
+    ~ps_vector() noexcept = default;
+    ps_vector(ps_vector&& aOther) noexcept(std::is_nothrow_move_constructible_v<T>) = default;
+    ps_vector(const ps_vector& aOther) noexcept(std::is_nothrow_copy_constructible_v<T>)= default;
+    ps_vector& operator=(ps_vector&& aOther) noexcept(std::is_nothrow_move_assignable_v<T>) = default;
+    ps_vector& operator=(const ps_vector& aOther) noexcept(std::is_nothrow_copy_assignable_v<T>) = default;
 
 private:
     std::vector<T> data_;
-    std::size_t m_capacity;
-    std::size_t m_firstAvailableEntry;
+    std::size_t    capacity_;
+    std::size_t    firstAvailableEntry_;
 
 public:
 
@@ -58,38 +58,39 @@ public:
     auto begin() noexcept { return data_.begin(); }
     auto begin() const noexcept { return data_.cbegin(); }
     auto cbegin() const noexcept { return data_.cbegin(); }
-    auto end() noexcept { return data_.begin() + m_firstAvailableEntry; }
-    auto end() const noexcept { return data_.cbegin() + m_firstAvailableEntry; }
-    auto cend() const noexcept { return data_.cbegin() + m_firstAvailableEntry; }
+    auto end() noexcept { return data_.begin() + firstAvailableEntry_; }
+    auto end() const noexcept { return data_.cbegin() + firstAvailableEntry_; }
+    auto cend() const noexcept { return data_.cbegin() + firstAvailableEntry_; }
 
-    bool empty() const { return m_firstAvailableEntry == 0; }
-    bool full() const { return m_firstAvailableEntry == m_capacity; }
-    std::size_t size() const { return m_firstAvailableEntry; }
-    std::size_t capacity() const { return m_capacity; }
-    std::size_t first_available() const { return m_firstAvailableEntry; }
+    bool empty() const { return firstAvailableEntry_ == 0; }
+    bool full() const { return firstAvailableEntry_ == capacity_; }
+    std::size_t size() const { return firstAvailableEntry_; }
+    std::size_t capacity() const { return capacity_; }
+    std::size_t first_available() const { return firstAvailableEntry_; }
 
     [[nodiscard]] T& operator[](std::size_t idx) {
 #ifdef STDAN_DEBUG
-        assert(idx < m_firstAvailableEntry);
+        assert(idx < firstAvailableEntry_);
 #endif
         return data_[idx];
     }
 
     [[nodiscard]] const T& operator[](std::size_t idx) const {
 #ifdef STDAN_DEBUG
-        assert(idx < m_firstAvailableEntry);
+        assert(idx < firstAvailableEntry_);
 #endif
         return data_[idx];
     }
 
     void resize(std::size_t aNewSize) requires std::default_initializable<T> {
         data_.resize(aNewSize);
-        m_firstAvailableEntry = aNewSize;
+        capacity_ = aNewSize;
+        if(aNewSize < firstAvailableEntry_) { firstAvailableEntry_ = aNewSize; }
     }
 
     [[nodiscard]] std::expected<std::size_t, error_code> index_of(const T& t) const requires std::equality_comparable<T> {
-        auto it = std::find(data_.begin(), data_.begin() + m_firstAvailableEntry, t);
-        if(it != data_.begin() + m_firstAvailableEntry) {
+        auto it = std::find(data_.begin(), data_.begin() + firstAvailableEntry_, t);
+        if(it != data_.begin() + firstAvailableEntry_) {
             return static_cast<std::size_t>(std::distance(data_.begin(), it));
         }
         return std::unexpected(error_code::ItemNotFound);
@@ -98,41 +99,41 @@ public:
     void append(T&& t) {
         if(full()) [[unlikely]] { return; }
 
-        if (m_firstAvailableEntry < data_.size()) [[likely]] { data_[m_firstAvailableEntry] = std::move(t); }
+        if (firstAvailableEntry_ < data_.size()) [[likely]] { data_[firstAvailableEntry_] = std::move(t); }
         else { data_.emplace_back(std::move(t)); }
-        ++m_firstAvailableEntry;
+        ++firstAvailableEntry_;
     }
 
     void append(const T& t) requires std::is_copy_constructible_v<T> {
         if(full()) [[unlikely]] { return; }
 
-        if(m_firstAvailableEntry < data_.size()) { data_[m_firstAvailableEntry] = t; }
+        if(firstAvailableEntry_ < data_.size()) { data_[firstAvailableEntry_] = t; }
         else { data_.emplace_back(t); }
-        ++m_firstAvailableEntry;
+        ++firstAvailableEntry_;
     }
 
     /// Considers the removed item as dead and gone but does not run the destructor.
     /// If you need to run the destructor, call `destroy`.
     void remove(std::size_t idx) {
 #ifdef STDAN_DEBUG
-        assert(idx < m_firstAvailableEntry);
+        assert(idx < firstAvailableEntry_);
 #endif
-        if(idx >= m_firstAvailableEntry) [[unlikely]] { return; }
+        if(idx >= firstAvailableEntry_) [[unlikely]] { return; }
 
-        --m_firstAvailableEntry;
-        if(idx != m_firstAvailableEntry) {
-            // Use move assignment instead of swap to save 2 operations
-            data_[idx] = std::move(data_[m_firstAvailableEntry]);
+        --firstAvailableEntry_;
+        if(idx != firstAvailableEntry_) {
+            // Use move assignment instead of swap to save 2 ops
+            data_[idx] = std::move(data_[firstAvailableEntry_]);
         }
     }
 
     /// The same as `remove` except also runs the destructor.
-    void destroy(std::size_t idx) requires std::is_nothrow_destructible_v<T> && std::is_nothrow_move_constructible_v<T> {
-        if(idx >= m_firstAvailableEntry) [[unlikely]] { return; }
-        if(idx != --m_firstAvailableEntry) {
-            std::destroy_at(std::addressof(data_[idx]));
-            std::construct_at(std::addressof(data_[idx]), std::move(data_[m_firstAvailableEntry]));
-        }
+    /// May throw if T's dtor or move dtor can throw.
+    void destroy(std::size_t idx) {
+        if(idx >= firstAvailableEntry_) [[unlikely]] { return; }
+        std::destroy_at(std::addressof(data_[idx]));
+        std::construct_at(std::addressof(data_[idx]), std::move(data_[firstAvailableEntry_]));
+        --firstAvailableEntry_;
     }
 
     /// Retrieves the const pointer for the element at the index.
@@ -142,7 +143,7 @@ public:
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<const T*, error_code> get(std::size_t idx) const {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(error_code::IndexOutOfBounds); }
+        if(idx >= firstAvailableEntry_) { return std::unexpected(error_code::IndexOutOfBounds); }
         return &data_[idx];
     }
 
@@ -153,7 +154,7 @@ public:
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<T*, error_code> get(std::size_t idx) {
-        if(idx >= m_firstAvailableEntry) { return std::unexpected(error_code::IndexOutOfBounds); }
+        if(idx >= firstAvailableEntry_) { return std::unexpected(error_code::IndexOutOfBounds); }
         return &data_[idx];
     }
 
@@ -164,7 +165,7 @@ public:
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
               data_.begin(),
-              data_.begin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
+              data_.begin() + static_cast<std::ptrdiff_t>(firstAvailableEntry_),
               [&aFunc](T& data) { aFunc(data); }
         );
     }
@@ -176,7 +177,7 @@ public:
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
               data_.cbegin(),
-              data_.cbegin() + static_cast<std::ptrdiff_t>(m_firstAvailableEntry),
+              data_.cbegin() + static_cast<std::ptrdiff_t>(firstAvailableEntry_),
               [&aFunc](const T& data) { aFunc(data); }
         );
     }

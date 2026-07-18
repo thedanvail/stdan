@@ -255,7 +255,8 @@ public:
     }
 
     template<typename... Args>
-    key emplace(Args&&... args) requires std::constructible_from<T, Args...> {
+    key emplace(Args&&... args) noexcept(std::is_nothrow_constructible_v<T, Args...>) 
+    requires std::constructible_from<T, Args...> {
         if(freeHead_ != InvalidIndex) {
             const std::uint32_t index = freeHead_;
             slot& s = slots_[index];
