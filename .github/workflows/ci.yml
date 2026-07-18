@@ -64,7 +64,8 @@ jobs:
 
       - name: Run tests
         run: make test
-  win_msvc_2022:
+
+  windows:
     name: Windows (Visual Studio 2022)
     runs-on: windows-2022
     steps:
