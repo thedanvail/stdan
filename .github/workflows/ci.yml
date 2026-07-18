@@ -66,7 +66,10 @@ jobs:
         run: make test
 
   windows:
+<<<<<<< HEAD
     name: Windows (Visual Studio 2022)
+=======
+>>>>>>> 1cd2b14 (ci: require GCC 14 on Linux and add Windows build/test job)
     runs-on: windows-2022
     steps:
       - name: Checkout Code
