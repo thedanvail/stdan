@@ -11,11 +11,8 @@
 #include <utility>
 #include <vector>
 
-namespace {
-    static inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
-}
-
 namespace stdan::storage {
+static inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
 template<typename T>
 class generational_slot_map {
@@ -55,18 +52,9 @@ private:
             requires std::is_move_constructible_v<T>
             : nextFree(0)
             , generation(otherSlot.generation)
-            , active(false) {
+            , active(otherSlot.active) {
                 if(otherSlot.active) {
-                    std::construct_at(
-                            std::addressof(value),
-                            std::move(otherSlot.value)
-                            );
-
-
-                    // Important:
-                    // Do NOT set otherSlot.active = false here.
-                    // The moved-from T is still alive and must be destroyed later.
-                    active = true;
+                    std::construct_at(std::addressof(value), std::move(otherSlot.value));
                 } else {
                     nextFree = otherSlot.nextFree;
                 }
