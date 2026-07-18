@@ -17,7 +17,7 @@ env:
   LLVM_VERSION: 22
 
 jobs:
-  linux_gcc_14:
+  linux:
     name: Linux (GCC 14)
     runs-on: ubuntu-24.04
     env:
