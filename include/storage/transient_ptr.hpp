@@ -35,12 +35,10 @@ public:
 
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
     friend bool operator==(const transient_ptr& lhs, std::nullptr_t) noexcept { return lhs.ptr_ == nullptr; }
-
     // Take T by const reference: MSVC rejects by-value parameters whose
     // alignment exceeds what the calling convention can guarantee (C2719),
     // which shows up for over-aligned T such as alignas(8192).
-    friend bool operator==(const transient_ptr& lhs, const T& rhs) noexcept(noexcept(*lhs.ptr_ == rhs))
-    requires std::equality_comparable<T> {
+    friend bool operator==(const transient_ptr& lhs, const T& rhs) noexcept requires std::equality_comparable<T> {
         if(lhs.ptr_ == nullptr) { return false; }
         return *lhs.ptr_ == rhs;
     }
