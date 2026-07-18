@@ -8,6 +8,7 @@
 #endif
 
 #include <memory>
+#include <stdexcept>
 
 namespace test_support {
 
