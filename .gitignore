@@ -1,7 +1,6 @@
 build/*
 build*/*
 .cache/
-*.md
 
 compile_commands.json
 

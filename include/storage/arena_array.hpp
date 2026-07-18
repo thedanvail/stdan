@@ -50,7 +50,7 @@ namespace stdan::storage {
             }
         }
 
-        const std::size_t size()     const { return size_; }
+        const std::size_t size()     const { return size_;     }
         const std::size_t capacity() const { return capacity_; }
 
         arena_array(arena_array&& other)                 = delete;
@@ -86,7 +86,7 @@ namespace stdan::storage {
             return transient_ptr<T>(&first_[idx]);
         }
 
-        transient_ptr<T> get(std::size_t idx) const {
+        transient_ptr<const T> get(std::size_t idx) const {
             if(!first_ || idx >= size_) { return {}; }
             return transient_ptr<T>(&first_[idx]);
         }
