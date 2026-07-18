@@ -5,7 +5,6 @@
 #include "test_base.hpp"
 
 #include <atomic>
-#include <memory>
 #include <stdexcept>
 
 namespace {
@@ -159,8 +158,8 @@ SCENARIO("move-only values survive pop-swap operations") {
         values.append(static_cast<move_only_value&&>(first));
         values.append(static_cast<move_only_value&&>(second));
 
-        REQUIRE(first.payload == nullptr);
-        REQUIRE(second.payload == nullptr);
+        REQUIRE(first.value == nullptr);
+        REQUIRE(second.value == nullptr);
         REQUIRE(values.size() == 2);
 
         WHEN("the first element is removed") {
@@ -168,8 +167,8 @@ SCENARIO("move-only values survive pop-swap operations") {
 
             THEN("the remaining value is preserved and compacted") {
                 REQUIRE(values.size() == 1);
-                REQUIRE(values[0].payload != nullptr);
-                REQUIRE(*values[0].payload == 11);
+                REQUIRE(values[0].value != nullptr);
+                REQUIRE(*values[0].value == 11);
             }
 
             THEN("a new move-only value can reuse the freed slot") {
@@ -177,8 +176,8 @@ SCENARIO("move-only values survive pop-swap operations") {
                 values.append(static_cast<move_only_value&&>(third));
 
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[1].payload != nullptr);
-                REQUIRE(*values[1].payload == 13);
+                REQUIRE(values[1].value != nullptr);
+                REQUIRE(*values[1].value == 13);
             }
         }
     }

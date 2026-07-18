@@ -94,13 +94,13 @@ struct arena_tracked_value {
 
 
 struct move_only_value {
-    std::unique_ptr<int> payload;
+    std::unique_ptr<int> value;
 
     move_only_value()
-        : payload(std::make_unique<int>(-1)) {}
+        : value(std::make_unique<int>(-1)) {}
 
     explicit move_only_value(int v)
-        : payload(std::make_unique<int>(v)) {}
+        : value(std::make_unique<int>(v)) {}
 
     move_only_value(move_only_value&&) noexcept = default;
     move_only_value& operator=(move_only_value&&) noexcept = default;
