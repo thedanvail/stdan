@@ -50,7 +50,7 @@ namespace stdan::storage {
             }
         }
 
-        const std::size_t size()     const { return size_; }
+        const std::size_t size()     const { return size_;     }
         const std::size_t capacity() const { return capacity_; }
 
         arena_array(arena_array&& other)                 = delete;

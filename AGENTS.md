@@ -19,4 +19,5 @@ Do not be overly eager to write code unless given the directive by the programme
 
 ## Maintainability
 
-Long term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't take shortcuts by just adding local logic to solve a problem.
+Long-term maintainability is a core priority. If you add new functionality, first check if there is shared logic that can be extracted to a separate module. Duplicate logic across multiple files is a code smell and should be avoided. Don't take shortcuts by just adding local logic to solve a problem.
+

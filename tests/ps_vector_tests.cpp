@@ -10,47 +10,8 @@
 
 namespace {
 using test_support::tracked_value;
-
-struct move_only_value {
-    std::unique_ptr<int> payload;
-
-    move_only_value()
-        : payload(std::make_unique<int>(-1)) {}
-
-    explicit move_only_value(int v)
-        : payload(std::make_unique<int>(v)) {}
-
-    move_only_value(move_only_value&&) noexcept = default;
-    move_only_value& operator=(move_only_value&&) noexcept = default;
-    move_only_value(const move_only_value&) = delete;
-    move_only_value& operator=(const move_only_value&) = delete;
-};
-
-struct throwing_copy_value {
-    inline static bool throw_on_copy = false;
-
-    int value = 0;
-
-    throwing_copy_value() = default;
-    explicit throwing_copy_value(int v) noexcept
-        : value(v) {}
-
-    throwing_copy_value(const throwing_copy_value& other)
-        : value(other.value) {
-        if(throw_on_copy) { throw std::runtime_error("copy construction failed"); }
-    }
-
-    throwing_copy_value(throwing_copy_value&&) noexcept = default;
-    throwing_copy_value& operator=(const throwing_copy_value& other) {
-        if(throw_on_copy) { throw std::runtime_error("copy assignment failed"); }
-        value = other.value;
-        return *this;
-    }
-
-    throwing_copy_value& operator=(throwing_copy_value&&) noexcept = default;
-
-    friend bool operator==(const throwing_copy_value& lhs, const throwing_copy_value& rhs) = default;
-};
+using test_support::throwing_copy_value;
+using test_support::move_only_value;
 } // namespace
 
 SCENARIO("resize grows default-constructible values within capacity") {

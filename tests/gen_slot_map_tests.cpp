@@ -23,35 +23,8 @@ static_assert(std::is_constructible_v<int_map::const_iterator, int_map::iterator
 static_assert(!std::is_constructible_v<int_map::iterator, int_map::const_iterator>);
 
 using test_support::tracked_value;
-
-struct move_only_value {
-    std::unique_ptr<int> value;
-
-    explicit move_only_value(int initial)
-        : value(std::make_unique<int>(initial)) {}
-
-    move_only_value(move_only_value&&) noexcept = default;
-    move_only_value& operator=(move_only_value&&) noexcept = default;
-    move_only_value(const move_only_value&) = delete;
-    move_only_value& operator=(const move_only_value&) = delete;
-};
-
-struct throwing_copy_value {
-    inline static bool throw_on_copy = false;
-
-    int value;
-
-    explicit throwing_copy_value(int initial) noexcept
-        : value(initial) {}
-
-    throwing_copy_value(const throwing_copy_value& other)
-        : value(other.value) {
-        if(throw_on_copy) { throw std::runtime_error("copy failed"); }
-    }
-
-    throwing_copy_value(throwing_copy_value&&) noexcept = default;
-};
-
+using test_support::move_only_value;
+using test_support::throwing_copy_value;
 } // namespace
 
 SCENARIO("a generational slot map is newly created") {
@@ -78,9 +51,10 @@ SCENARIO("values are inserted into a generational slot map") {
                 REQUIRE_FALSE(values.empty());
                 REQUIRE(values.size() == 1);
                 REQUIRE(values.contains(key));
-                auto pointer = values.get(key);
-                REQUIRE(pointer != nullptr);
-                const int retrieved = static_cast<decltype(pointer)&&>(pointer).apply_non_null([](int& candidate) { return candidate; });
+                REQUIRE(values.get(key) != nullptr);
+                const int retrieved = values.get(key).apply_non_null([](int& candidate) {
+                    return candidate;
+                });
                 REQUIRE(retrieved == 7);
             }
         }
@@ -96,9 +70,8 @@ SCENARIO("values are inserted into a generational slot map") {
             THEN("ownership is transferred into the map") {
                 REQUIRE(source.value == nullptr);
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(key);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](move_only_value& stored) {
+                REQUIRE(values.get(key) != nullptr);
+                values.get(key).apply_non_null([](move_only_value& stored) {
                     REQUIRE(stored.value != nullptr);
                     REQUIRE(*stored.value == 11);
                 });
@@ -206,9 +179,10 @@ SCENARIO("a removed slot is reused") {
                 REQUIRE(current_key.index == stale_key.index);
                 REQUIRE(current_key.generation != stale_key.generation);
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(current_key);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](int& value) { REQUIRE(value == 11); });
+                REQUIRE(values.get(current_key) != nullptr);
+                values.get(current_key).apply_non_null([](int& value) {
+                    REQUIRE(value == 11);
+                });
             }
 
             THEN("the stale key cannot access or remove the replacement") {
@@ -328,11 +302,9 @@ SCENARIO("a generational slot map is accessed through const qualification") {
         const int_map& const_values = values;
 
         WHEN("the value is looked up") {
-            auto pointer = const_values.get(key);
-
             THEN("a readable const transient pointer is returned") {
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](const int& value) {
+                REQUIRE(const_values.get(key) != nullptr);
+                const_values.get(key).apply_non_null([](const int& value) {
                     REQUIRE(value == 29);
                 });
             }
@@ -377,9 +349,8 @@ SCENARIO("a generational slot map is cleared") {
             THEN("new insertions work after the clear") {
                 const auto key = values.emplace(tracked_value{3});
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(key);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](tracked_value& stored) {
+                REQUIRE(values.get(key) != nullptr);
+                values.get(key).apply_non_null([](tracked_value& stored) {
                     REQUIRE(stored.value == 3);
                 });
             }

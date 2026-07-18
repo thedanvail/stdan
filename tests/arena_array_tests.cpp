@@ -5,7 +5,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
-#include <utility>
+#include <memory>
 
 namespace {
     using test_support::arena_tracked_value;
@@ -65,8 +65,7 @@ SCENARIO_METHOD(arena_array_fixture, "values are appended to an arena_array") {
 
             THEN("the lookup reports that no live value exists there") {
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(1);
-                REQUIRE(pointer == nullptr);
+                REQUIRE(values.get(1) == nullptr);
             }
         }
     }
@@ -84,12 +83,10 @@ SCENARIO_METHOD(arena_array_fixture, "appending past capacity") {
             THEN("the array remains unchanged") {
                 REQUIRE_FALSE(appended);
                 REQUIRE(values.size() == 2);
-                auto first = values.get(0);
-                auto second = values.get(1);
-                REQUIRE(first != nullptr);
-                REQUIRE(second != nullptr);
-                static_cast<decltype(first)&&>(first).apply_non_null([](int& value) { REQUIRE(value == 7); });
-                static_cast<decltype(second)&&>(second).apply_non_null([](int& value) { REQUIRE(value == 11); });
+                REQUIRE(values.get(0) != nullptr);
+                REQUIRE(values.get(1) != nullptr);
+                values.get(0).apply_non_null([](int& value) { REQUIRE(value == 7); });
+                values.get(1).apply_non_null([](int& value) { REQUIRE(value == 11); });
             }
         }
     }
@@ -106,17 +103,16 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
 
             THEN("it becomes empty") {
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(static_cast<bool>(values.get(0)));
-                REQUIRE_FALSE(static_cast<bool>(values.get(1)));
+                REQUIRE(values.get(0) == nullptr);
+                REQUIRE(values.get(1) == nullptr);
             }
 
             THEN("new values can be written from the beginning again") {
                 REQUIRE(values.emplace_back(99));
 
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(0);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](int& value) { REQUIRE(value == 99); });
+                REQUIRE(values.get(0) != nullptr);
+                values.get(0).apply_non_null([](int& value) { REQUIRE(value == 99); });
             }
         }
     }
@@ -144,17 +140,16 @@ SCENARIO_METHOD(arena_array_fixture, "resetting an arena_array") {
                 REQUIRE(arena_tracked_value::destructor_calls == 2);
                 REQUIRE(arena_tracked_value::live_instances == 0);
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(static_cast<bool>(values.get(0)));
-                REQUIRE_FALSE(static_cast<bool>(values.get(1)));
+                REQUIRE(values.get(0) == nullptr);
+                REQUIRE(values.get(1) == nullptr);
             }
 
             THEN("the array storage can be reused from the beginning") {
                 REQUIRE(values.emplace_back(arena_tracked_value{99}));
 
                 REQUIRE(values.size() == 1);
-                auto pointer = values.get(0);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](arena_tracked_value& value) {
+                REQUIRE(values.get(0) != nullptr);
+                values.get(0).apply_non_null([](arena_tracked_value& value) {
                     REQUIRE(value.value == 99);
                 });
                 REQUIRE(arena_tracked_value::live_instances == 1);
@@ -174,7 +169,7 @@ SCENARIO_METHOD(arena_array_fixture, "a zero-capacity arena_array remains empty"
                 REQUIRE_FALSE(appended);
                 REQUIRE(values.capacity() == 0);
                 REQUIRE(values.size() == 0);
-                REQUIRE_FALSE(static_cast<bool>(values.get(0)));
+                REQUIRE(values.get(0) == nullptr);
             }
         }
     }
@@ -189,18 +184,17 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values"
         REQUIRE(over_aligned_value::live_instances == 2);
 
         WHEN("the values are accessed") {
-            auto first = values.get(0);
-            auto second = values.get(1);
-
             THEN("access uses the aligned address returned by the arena") {
-                REQUIRE(first != nullptr);
-                REQUIRE(second != nullptr);
-                auto* first_ptr = static_cast<decltype(first)&&>(first).apply([](auto* candidate) { return candidate; });
-                auto* second_ptr = static_cast<decltype(second)&&>(second).apply([](auto* candidate) { return candidate; });
-                REQUIRE(reinterpret_cast<std::uintptr_t>(first_ptr) % alignof(over_aligned_value) == 0);
-                REQUIRE(reinterpret_cast<std::uintptr_t>(second_ptr) % alignof(over_aligned_value) == 0);
-                REQUIRE(first_ptr->value == 7);
-                REQUIRE(second_ptr->value == 11);
+                REQUIRE(values.get(0) != nullptr);
+                REQUIRE(values.get(1) != nullptr);
+                values.get(0).apply_non_null([](over_aligned_value& value) {
+                    REQUIRE(reinterpret_cast<std::uintptr_t>(std::addressof(value)) % alignof(over_aligned_value) == 0);
+                    REQUIRE(value.value == 7);
+                });
+                values.get(1).apply_non_null([](over_aligned_value& value) {
+                    REQUIRE(reinterpret_cast<std::uintptr_t>(std::addressof(value)) % alignof(over_aligned_value) == 0);
+                    REQUIRE(value.value == 11);
+                });
 
                 std::size_t applied = 0;
                 values.apply([&applied](over_aligned_value* value) {
@@ -218,9 +212,10 @@ SCENARIO_METHOD(arena_array_fixture, "an arena_array stores over-aligned values"
                 REQUIRE(over_aligned_value::live_instances == 0);
                 REQUIRE(values.size() == 0);
                 REQUIRE(values.emplace_back(99));
-                auto pointer = values.get(0);
-                REQUIRE(pointer != nullptr);
-                static_cast<decltype(pointer)&&>(pointer).apply_non_null([](over_aligned_value& value) { REQUIRE(value.value == 99); });
+                REQUIRE(values.get(0) != nullptr);
+                values.get(0).apply_non_null([](over_aligned_value& value) {
+                    REQUIRE(value.value == 99);
+                });
             }
         }
     }
