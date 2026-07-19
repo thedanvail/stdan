@@ -17,7 +17,8 @@ env:
   LLVM_VERSION: 22
 
 jobs:
-  Linux (GCC 14):
+  linux_gcc_14:
+    name: Linux (GCC 14)
     runs-on: ubuntu-24.04
     env:
       CC: gcc-14
@@ -63,8 +64,8 @@ jobs:
 
       - name: Run tests
         run: make test
-
-  Windows (Visual Studio 2022):
+  win_msvc_2022:
+    name: Windows (Visual Studio 2022):
     runs-on: windows-2022
     steps:
       - name: Checkout Code
