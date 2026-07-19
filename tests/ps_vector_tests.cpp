@@ -77,31 +77,41 @@ SCENARIO("resize truncates logical elements when physical storage shrinks") {
     }
 }
 
-SCENARIO("append stores values until the vector is full") {
-    GIVEN("a vector with reserved capacity") {
+SCENARIO("append grows a vector beyond its current capacity") {
+    GIVEN("a vector filled to its reported capacity") {
         stdan::storage::ps_vector<int> values(2);
-        const auto available_capacity = values.capacity();
-        REQUIRE(available_capacity >= 2);
+        const auto initial_capacity = values.capacity();
+        REQUIRE(initial_capacity >= 2);
 
-        WHEN("the reported capacity is filled") {
-            for(std::size_t index = 0; index < available_capacity; ++index) {
-                values.append(static_cast<int>(index + 1));
-            }
+        for(std::size_t index = 0; index < initial_capacity; ++index) {
+            values.append(static_cast<int>(index + 1));
+        }
+        REQUIRE(values.full());
 
-            THEN("all appended values are live and retain their order") {
-                REQUIRE(values.full());
-                REQUIRE(values.size() == available_capacity);
-                for(std::size_t index = 0; index < available_capacity; ++index) {
+        WHEN("an rvalue is appended") {
+            values.append(999);
+
+            THEN("the vector grows without losing existing values") {
+                REQUIRE(values.size() == initial_capacity + 1);
+                REQUIRE(values.capacity() >= values.size());
+                for(std::size_t index = 0; index < initial_capacity; ++index) {
                     REQUIRE(live_value_at(values, index) == static_cast<int>(index + 1));
                 }
+                REQUIRE(live_value_at(values, initial_capacity) == 999);
             }
+        }
 
-            THEN("an additional append leaves the full vector unchanged") {
-                values.append(999);
+        WHEN("an lvalue is appended") {
+            const int appended = 999;
+            values.append(appended);
 
-                REQUIRE(values.full());
-                REQUIRE(values.size() == available_capacity);
-                REQUIRE(live_value_at(values, available_capacity - 1) == static_cast<int>(available_capacity));
+            THEN("the vector grows without losing existing values") {
+                REQUIRE(values.size() == initial_capacity + 1);
+                REQUIRE(values.capacity() >= values.size());
+                for(std::size_t index = 0; index < initial_capacity; ++index) {
+                    REQUIRE(live_value_at(values, index) == static_cast<int>(index + 1));
+                }
+                REQUIRE(live_value_at(values, initial_capacity) == appended);
             }
         }
     }
