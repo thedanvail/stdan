@@ -5,67 +5,103 @@
 #include "test_base.hpp"
 
 #include <atomic>
+#include <cstddef>
 #include <stdexcept>
 
 namespace {
-using test_support::tracked_value;
-using test_support::throwing_copy_value;
 using test_support::move_only_value;
+using test_support::throwing_copy_value;
+using test_support::tracked_value;
+
+template<typename T>
+T& live_value_at(stdan::storage::ps_vector<T>& values, std::size_t index) {
+    auto value = values.get(index);
+    REQUIRE(value.has_value());
+    return *value.value();
+}
 } // namespace
 
-SCENARIO("resize grows default-constructible values within capacity") {
-    GIVEN("a vector with spare capacity") {
+SCENARIO("resize preconstructs reusable storage without creating logical elements") {
+    GIVEN("an empty vector with reserved capacity") {
         stdan::storage::ps_vector<int> values(4);
 
-        WHEN("it is resized up within capacity") {
+        WHEN("storage is preconstructed within the current allocation") {
             values.resize(2);
 
-            THEN("the size grows to the requested value") {
+            THEN("the vector remains logically empty") {
+                REQUIRE(values.empty());
+                REQUIRE(values.size() == 0);
+                REQUIRE(values.capacity() >= 4);
+                REQUIRE_FALSE(values.get(0).has_value());
+            }
+
+            THEN("appends reuse the preconstructed storage") {
+                values.append(7);
+                values.append(11);
+
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[0]     == 0);
-                REQUIRE(values[1]     == 0);
+                REQUIRE(live_value_at(values, 0) == 7);
+                REQUIRE(live_value_at(values, 1) == 11);
             }
         }
 
-        WHEN("it is resized beyond capacity") {
+        WHEN("storage is preconstructed beyond the current allocation") {
             values.resize(5);
 
-            THEN("the vector grows to the requested size") {
-                REQUIRE(values.size() == 5);
-                REQUIRE(values[0]     == 0);
-                REQUIRE(values[1]     == 0);
-                REQUIRE(values[2]     == 0);
-                REQUIRE(values[3]     == 0);
-                REQUIRE(values[4]     == 0);
+            THEN("the allocation grows but the vector remains logically empty") {
+                REQUIRE(values.empty());
+                REQUIRE(values.capacity() >= 5);
+                REQUIRE_FALSE(values.get(0).has_value());
+            }
+        }
+    }
+}
+
+SCENARIO("resize truncates logical elements when physical storage shrinks") {
+    GIVEN("a vector containing several values") {
+        stdan::storage::ps_vector<int> values(4);
+        values.append(7);
+        values.append(11);
+        values.append(13);
+
+        WHEN("the physical storage is resized below the logical size") {
+            values.resize(2);
+
+            THEN("only elements that still have backing storage remain live") {
+                REQUIRE(values.size() == 2);
+                REQUIRE(live_value_at(values, 0) == 7);
+                REQUIRE(live_value_at(values, 1) == 11);
+                REQUIRE_FALSE(values.get(2).has_value());
             }
         }
     }
 }
 
 SCENARIO("append stores values until the vector is full") {
-    GIVEN("a vector with spare capacity") {
+    GIVEN("a vector with reserved capacity") {
         stdan::storage::ps_vector<int> values(2);
+        const auto available_capacity = values.capacity();
+        REQUIRE(available_capacity >= 2);
 
-        WHEN("values are appended") {
-            values.append(7);
-            values.append(11);
-
-            THEN("the values are stored in order") {
-                REQUIRE(values.size() == 2);
-                REQUIRE(values[0] == 7);
-                REQUIRE(values[1] == 11);
+        WHEN("the reported capacity is filled") {
+            for(std::size_t index = 0; index < available_capacity; ++index) {
+                values.append(static_cast<int>(index + 1));
             }
-        }
 
-        WHEN("an append is attempted after capacity is reached") {
-            values.append(7);
-            values.append(11);
-            values.append(13);
+            THEN("all appended values are live and retain their order") {
+                REQUIRE(values.full());
+                REQUIRE(values.size() == available_capacity);
+                for(std::size_t index = 0; index < available_capacity; ++index) {
+                    REQUIRE(live_value_at(values, index) == static_cast<int>(index + 1));
+                }
+            }
 
-            THEN("the vector remains full and unchanged") {
-                REQUIRE(values.size() == 2);
-                REQUIRE(values[0] == 7);
-                REQUIRE(values[1] == 11);
+            THEN("an additional append leaves the full vector unchanged") {
+                values.append(999);
+
+                REQUIRE(values.full());
+                REQUIRE(values.size() == available_capacity);
+                REQUIRE(live_value_at(values, available_capacity - 1) == static_cast<int>(available_capacity));
             }
         }
     }
@@ -81,41 +117,54 @@ SCENARIO("remove swaps the last live element into the removed slot") {
         WHEN("the middle element is removed") {
             values.remove(1);
 
-            THEN("the last live value is moved into the vacated slot") {
+            THEN("the last live value occupies the vacated logical slot") {
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[0] == 7);
-                REQUIRE(values[1] == 13);
+                REQUIRE(live_value_at(values, 0) == 7);
+                REQUIRE(live_value_at(values, 1) == 13);
+                REQUIRE_FALSE(values.get(2).has_value());
+            }
+        }
+
+        WHEN("the last element is removed") {
+            values.remove(2);
+
+            THEN("the preceding elements retain their order") {
+                REQUIRE(values.size() == 2);
+                REQUIRE(live_value_at(values, 0) == 7);
+                REQUIRE(live_value_at(values, 1) == 11);
             }
         }
     }
 }
 
-SCENARIO("index_of finds live elements and reports missing ones") {
-    GIVEN("a vector with known values") {
+SCENARIO("index_of searches only the live range") {
+    GIVEN("a vector with a removed value in reusable storage") {
         stdan::storage::ps_vector<int> values(3);
         values.append(5);
         values.append(9);
+        values.append(42);
+        values.remove(2);
 
-        WHEN("a present value is queried") {
+        WHEN("a live value is queried") {
             auto index = values.index_of(9);
 
-            THEN("the matching index is returned") {
+            THEN("the matching logical index is returned") {
                 REQUIRE(index.has_value());
                 REQUIRE(index.value() == 1);
             }
         }
 
-        WHEN("a missing value is queried") {
+        WHEN("the removed value is queried") {
             auto index = values.index_of(42);
 
-            THEN("the lookup reports failure") {
+            THEN("the inactive backing slot is ignored") {
                 REQUIRE_FALSE(index.has_value());
             }
         }
     }
 }
 
-SCENARIO("destroy removes elements and destroys their storage") {
+SCENARIO("remove retains constructed backing objects for reuse") {
     GIVEN("a vector containing tracked values") {
         tracked_value::reset();
         stdan::storage::ps_vector<tracked_value> values(4);
@@ -124,27 +173,50 @@ SCENARIO("destroy removes elements and destroys their storage") {
         values.append(tracked_value{3});
 
         REQUIRE(values.size() == 3);
+        REQUIRE(tracked_value::live == 3);
 
-        WHEN("the middle element is destroyed") {
-            const auto destroyed_before = tracked_value::destroyed;
-            values.destroy(1);
+        WHEN("the middle value is removed") {
+            const auto live_before_remove = tracked_value::live;
+            values.remove(1);
 
-            THEN("the destructor runs and the remaining elements stay live") {
+            THEN("logical compaction does not end a backing object's lifetime") {
                 REQUIRE(values.size() == 2);
-                REQUIRE(tracked_value::destroyed == destroyed_before + 1);
-                REQUIRE(values[0].value == 1);
-                REQUIRE(values[1].value == 3);
+                REQUIRE(tracked_value::live == live_before_remove);
+                REQUIRE(live_value_at(values, 0).value == 1);
+                REQUIRE(live_value_at(values, 1).value == 3);
+                REQUIRE_FALSE(values.get(2).has_value());
             }
 
-            THEN("the vacated slot can be reused without leaks") {
+            THEN("the inactive backing object is reused by a later append") {
                 tracked_value replacement{99};
-                const auto destroyed_before_append = tracked_value::destroyed;
+                const auto live_before_append = tracked_value::live;
                 values.append(std::move(replacement));
 
                 REQUIRE(values.size() == 3);
-                REQUIRE(values[2].value == 99);
-                REQUIRE(tracked_value::destroyed == destroyed_before_append);
+                REQUIRE(tracked_value::live == live_before_append);
+                REQUIRE(live_value_at(values, 2).value == 99);
             }
+        }
+    }
+}
+
+SCENARIO("inactive backing objects are destroyed with the vector") {
+    tracked_value::reset();
+
+    WHEN("a vector containing a removed value leaves scope") {
+        {
+            stdan::storage::ps_vector<tracked_value> values(3);
+            values.append(tracked_value{1});
+            values.append(tracked_value{2});
+            values.append(tracked_value{3});
+            values.remove(1);
+
+            REQUIRE(values.size() == 2);
+            REQUIRE(tracked_value::live == 3);
+        }
+
+        THEN("all constructed backing objects are destroyed") {
+            REQUIRE(tracked_value::live == 0);
         }
     }
 }
@@ -155,8 +227,8 @@ SCENARIO("move-only values survive pop-swap operations") {
         move_only_value first{7};
         move_only_value second{11};
 
-        values.append(static_cast<move_only_value&&>(first));
-        values.append(static_cast<move_only_value&&>(second));
+        values.append(std::move(first));
+        values.append(std::move(second));
 
         REQUIRE(first.value == nullptr);
         REQUIRE(second.value == nullptr);
@@ -167,59 +239,61 @@ SCENARIO("move-only values survive pop-swap operations") {
 
             THEN("the remaining value is preserved and compacted") {
                 REQUIRE(values.size() == 1);
-                REQUIRE(values[0].value != nullptr);
-                REQUIRE(*values[0].value == 11);
+                REQUIRE(live_value_at(values, 0).value != nullptr);
+                REQUIRE(*live_value_at(values, 0).value == 11);
             }
 
-            THEN("a new move-only value can reuse the freed slot") {
+            THEN("a new move-only value reuses the inactive backing slot") {
                 move_only_value third{13};
-                values.append(static_cast<move_only_value&&>(third));
+                values.append(std::move(third));
 
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[1].value != nullptr);
-                REQUIRE(*values[1].value == 13);
+                REQUIRE(third.value == nullptr);
+                REQUIRE(live_value_at(values, 1).value != nullptr);
+                REQUIRE(*live_value_at(values, 1).value == 13);
             }
         }
     }
 }
 
-SCENARIO("append propagates copy-assignment failures without corrupting state") {
-    GIVEN("a vector with spare pre-allocated capacity") {
+SCENARIO("append propagates copy-assignment failures without changing logical size") {
+    GIVEN("a vector with reusable preconstructed storage") {
+        throwing_copy_value::throw_on_copy = false;
         stdan::storage::ps_vector<throwing_copy_value> values(3);
         values.resize(2);
-        values[0].value = 42;
-        values[1].value = 77;
+        values.append(throwing_copy_value{42});
+        values.append(throwing_copy_value{77});
         values.remove(1);
         REQUIRE(values.size() == 1);
 
         throwing_copy_value source{99};
 
-        WHEN("copy assignment throws during append") {
+        WHEN("copy assignment into the reusable slot throws") {
             throwing_copy_value::throw_on_copy = true;
 
-            THEN("the exception propagates and the vector remains unchanged") {
+            THEN("the exception propagates and the logical range remains unchanged") {
                 REQUIRE_THROWS_AS(values.append(source), std::runtime_error);
                 REQUIRE(values.size() == 1);
-                REQUIRE(values[0].value == 42);
+                REQUIRE(live_value_at(values, 0).value == 42);
 
+                throwing_copy_value::throw_on_copy = false;
                 throwing_copy_value replacement{19};
-                replacement.throw_on_copy = false;
                 REQUIRE_NOTHROW(values.append(replacement));
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[1].value == 19);
+                REQUIRE(live_value_at(values, 1).value == 19);
             }
         }
     }
 }
 
-SCENARIO("for_each ignores padding beyond the live range") {
-    GIVEN("a vector with extra reserved elements") {
+SCENARIO("for_each ignores constructed storage beyond the live range") {
+    GIVEN("a vector with inactive preconstructed elements") {
         stdan::storage::ps_vector<int> values(6);
         values.resize(4);
-        values[0] = 7;
-        values[1] = 11;
-        values[2] = 13;
-        values[3] = 17;
+        values.append(7);
+        values.append(11);
+        values.append(13);
+        values.append(17);
         values.remove(3);
         values.remove(2);
         REQUIRE(values.size() == 2);
@@ -235,8 +309,28 @@ SCENARIO("for_each ignores padding beyond the live range") {
             THEN("only live elements are processed") {
                 REQUIRE(total.load(std::memory_order_relaxed) == 18);
                 REQUIRE(values.size() == 2);
-                REQUIRE(values[0] == 14);
-                REQUIRE(values[1] == 22);
+                REQUIRE(live_value_at(values, 0) == 14);
+                REQUIRE(live_value_at(values, 1) == 22);
+            }
+        }
+    }
+}
+
+SCENARIO("moving a ps_vector transfers its logical range") {
+    GIVEN("a vector containing live values") {
+        stdan::storage::ps_vector<int> source(3);
+        source.append(7);
+        source.append(11);
+
+        WHEN("the vector is move-constructed") {
+            stdan::storage::ps_vector<int> destination(std::move(source));
+
+            THEN("the destination owns the values and the source is logically empty") {
+                REQUIRE(destination.size() == 2);
+                REQUIRE(live_value_at(destination, 0) == 7);
+                REQUIRE(live_value_at(destination, 1) == 11);
+                REQUIRE(source.empty());
+                REQUIRE(source.begin() == source.end());
             }
         }
     }
