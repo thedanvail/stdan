@@ -55,6 +55,7 @@ public:
         other.logical_size_ = 0;
     }
     ps_vector& operator=(ps_vector&& other) {
+        if(this == &other) { return *this; }
         data_ = std::move(other.data_);
         logical_size_ = other.logical_size_;
         other.logical_size_ = 0;
@@ -94,7 +95,7 @@ public:
     }
 
     void append(T&& t) requires stdan::concepts::move_reusable<T> {
-        if(full()) [[unlikely]] { return; }
+        if(full()) [[unlikely]] { data_.resize(data_.size() * 1.5); }
 
         if (logical_size_ < data_.size()) [[likely]] { data_[logical_size_] = std::move(t); }
         else { data_.emplace_back(std::move(t)); }
@@ -102,7 +103,7 @@ public:
     }
 
     void append(const T& t) requires stdan::concepts::copy_reusable<T> {
-        if(full()) [[unlikely]] { return; }
+        if(full()) [[unlikely]] { data_.resize(data_.size() * 1.5); }
 
         if(logical_size_ < data_.size()) { data_[logical_size_] = t; }
         else { data_.emplace_back(t); }
