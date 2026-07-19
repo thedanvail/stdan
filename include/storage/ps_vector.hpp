@@ -79,7 +79,6 @@ public:
     bool full() const { return logical_size_ >= data_.capacity(); }
     std::size_t size() const { return logical_size_; }
     std::size_t capacity() const { return data_.capacity(); }
-    std::size_t first_available() const { return logical_size_; }
 
     void resize(std::size_t size) requires std::default_initializable<T> {
         data_.resize(size);

@@ -19,7 +19,7 @@
 #include <utility>
 
 
-namespace {
+namespace stdan::assert {
 inline void assertFailed(
     const char* expr,
     const char* file,
@@ -48,7 +48,7 @@ void assertFailed(
 #define dassert(expr, ...)            \
 do {                                  \
     if (!(expr)) {                    \
-        ::assertFailed(               \
+        stdan::assert::assertFailed(  \
             #expr, __FILE__, __LINE__ \
             __VA_OPT__(,) __VA_ARGS__ \
         );                            \
