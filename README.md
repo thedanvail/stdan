@@ -73,3 +73,6 @@ git submodule update --init --recursive
 - `compile_commands.json` can be generated as part of the configured build.
 - The project currently uses a static library build.
 
+## Contributing
+See [CONTRIBUTING.md](CONTRIBUTING.md)
+
