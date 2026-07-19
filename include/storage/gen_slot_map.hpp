@@ -12,7 +12,7 @@
 #include <vector>
 
 namespace stdan::storage {
-static inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
+inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
 
 template<typename T>
 class generational_slot_map {
