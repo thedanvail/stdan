@@ -1,12 +1,5 @@
 #pragma once
 
-// Unused right now, but might use later on.
-// I wish these could be supported in a standard way.
-// Maybe they are and I'm just stupid. It's possible.
-#if defined(WIN32) || defined(__WIN32__) || defined(_WIN32) || defined(_MSC_VER)
-#define STDAN_WIN
-#endif
-
 #include <memory>
 #include <stdexcept>
 

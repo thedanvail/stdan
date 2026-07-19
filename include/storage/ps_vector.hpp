@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/base.hpp"
 #include "storage/storage_base.hpp"
 
 #include <algorithm>
@@ -35,22 +36,28 @@ public:
     // `resize` immediately after constructing a ps_vector so
     // that the construction can all take place at once.
     // You live your life tho
-    ps_vector(std::size_t aCapacity)
-        : capacity_(aCapacity)
-        , firstAvailableEntry_(0) {
+    ps_vector(std::size_t aCapacity = 0) {
         data_.reserve(aCapacity);
     }
 
-    ~ps_vector() noexcept = default;
-    ps_vector(ps_vector&& aOther) noexcept(std::is_nothrow_move_constructible_v<T>) = default;
-    ps_vector(const ps_vector& aOther) noexcept(std::is_nothrow_copy_constructible_v<T>)= default;
-    ps_vector& operator=(ps_vector&& aOther) noexcept(std::is_nothrow_move_assignable_v<T>) = default;
-    ps_vector& operator=(const ps_vector& aOther) noexcept(std::is_nothrow_copy_assignable_v<T>) = default;
+    ~ps_vector()                                  = default;
+    ps_vector(const ps_vector& aOther)            = default;
+    ps_vector& operator=(const ps_vector& aOther) = default;
+
+    ps_vector(ps_vector&& other) {
+        data_ = std::move(other.data_);
+        logical_size_ = other.logical_size_;
+        other.logical_size_ = 0;
+    }
+    ps_vector& operator=(ps_vector&& other) {
+        data_ = std::move(other.data_);
+        logical_size_ = other.logical_size_;
+        other.logical_size_ = 0;
+    }
 
 private:
     std::vector<T> data_;
-    std::size_t    capacity_;
-    std::size_t    firstAvailableEntry_;
+    std::size_t    logical_size_ = 0;
 
 public:
 
@@ -58,82 +65,54 @@ public:
     auto begin() noexcept { return data_.begin(); }
     auto begin() const noexcept { return data_.cbegin(); }
     auto cbegin() const noexcept { return data_.cbegin(); }
-    auto end() noexcept { return data_.begin() + firstAvailableEntry_; }
-    auto end() const noexcept { return data_.cbegin() + firstAvailableEntry_; }
-    auto cend() const noexcept { return data_.cbegin() + firstAvailableEntry_; }
+    auto end() noexcept { return data_.begin() + logical_size_; }
+    auto end() const noexcept { return data_.cbegin() + logical_size_; }
+    auto cend() const noexcept { return data_.cbegin() + logical_size_; }
 
-    bool empty() const { return firstAvailableEntry_ == 0; }
-    bool full() const { return firstAvailableEntry_ == capacity_; }
-    std::size_t size() const { return firstAvailableEntry_; }
-    std::size_t capacity() const { return capacity_; }
-    std::size_t first_available() const { return firstAvailableEntry_; }
+    bool empty() const { return logical_size_ == 0; }
+    bool full() const { return logical_size_ >= data_.capacity(); }
+    std::size_t size() const { return logical_size_; }
+    std::size_t capacity() const { return data_.capacity(); }
+    std::size_t first_available() const { return logical_size_; }
 
-    [[nodiscard]] T& operator[](std::size_t idx) {
-#ifdef STDAN_DEBUG
-        assert(idx < firstAvailableEntry_);
-#endif
-        return data_[idx];
-    }
-
-    [[nodiscard]] const T& operator[](std::size_t idx) const {
-#ifdef STDAN_DEBUG
-        assert(idx < firstAvailableEntry_);
-#endif
-        return data_[idx];
-    }
-
-    void resize(std::size_t aNewSize) requires std::default_initializable<T> {
-        data_.resize(aNewSize);
-        capacity_ = aNewSize;
-        if(aNewSize < firstAvailableEntry_) { firstAvailableEntry_ = aNewSize; }
+    void resize(std::size_t size) requires std::default_initializable<T> {
+        data_.resize(size);
+        if(size < logical_size_) { logical_size_ = size; }
     }
 
     [[nodiscard]] std::expected<std::size_t, error_code> index_of(const T& t) const requires std::equality_comparable<T> {
-        auto it = std::find(data_.begin(), data_.begin() + firstAvailableEntry_, t);
-        if(it != data_.begin() + firstAvailableEntry_) {
+        auto it = std::find(data_.begin(), data_.begin() + logical_size_, t);
+        if(it != data_.begin() + logical_size_) {
             return static_cast<std::size_t>(std::distance(data_.begin(), it));
         }
         return std::unexpected(error_code::ItemNotFound);
     }
 
-    void append(T&& t) {
+    void append(T&& t) requires stdan::concepts::move_reusable<T> {
         if(full()) [[unlikely]] { return; }
 
-        if (firstAvailableEntry_ < data_.size()) [[likely]] { data_[firstAvailableEntry_] = std::move(t); }
+        if (logical_size_ < data_.size()) [[likely]] { data_[logical_size_] = std::move(t); }
         else { data_.emplace_back(std::move(t)); }
-        ++firstAvailableEntry_;
+        ++logical_size_;
     }
 
-    void append(const T& t) requires std::is_copy_constructible_v<T> {
+    void append(const T& t) requires stdan::concepts::copy_reusable<T> {
         if(full()) [[unlikely]] { return; }
 
-        if(firstAvailableEntry_ < data_.size()) { data_[firstAvailableEntry_] = t; }
+        if(logical_size_ < data_.size()) { data_[logical_size_] = t; }
         else { data_.emplace_back(t); }
-        ++firstAvailableEntry_;
+        ++logical_size_;
     }
 
-    /// Considers the removed item as dead and gone but does not run the destructor.
-    /// If you need to run the destructor, call `destroy`.
+    /// Considers the removed item as dead and gone but does not destroy nor deallocate the backing slot.
     void remove(std::size_t idx) {
-#ifdef STDAN_DEBUG
-        assert(idx < firstAvailableEntry_);
-#endif
-        if(idx >= firstAvailableEntry_) [[unlikely]] { return; }
-
-        --firstAvailableEntry_;
-        if(idx != firstAvailableEntry_) {
-            // Use move assignment instead of swap to save 2 ops
-            data_[idx] = std::move(data_[firstAvailableEntry_]);
+        dassert(idx < logical_size_);
+        if(idx >= logical_size_) [[unlikely]] { return; }
+        if(idx != logical_size_ - 1) {
+            using std::swap;
+            swap(data_[idx], data_[logical_size_ - 1]);
         }
-    }
-
-    /// The same as `remove` except also runs the destructor.
-    /// May throw if T's dtor or move dtor can throw.
-    void destroy(std::size_t idx) {
-        if(idx >= firstAvailableEntry_) [[unlikely]] { return; }
-        std::destroy_at(std::addressof(data_[idx]));
-        std::construct_at(std::addressof(data_[idx]), std::move(data_[firstAvailableEntry_]));
-        --firstAvailableEntry_;
+        --logical_size_;
     }
 
     /// Retrieves the const pointer for the element at the index.
@@ -143,7 +122,7 @@ public:
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<const T*, error_code> get(std::size_t idx) const {
-        if(idx >= firstAvailableEntry_) { return std::unexpected(error_code::IndexOutOfBounds); }
+        if(idx >= logical_size_) { return std::unexpected(error_code::IndexOutOfBounds); }
         return &data_[idx];
     }
 
@@ -154,30 +133,30 @@ public:
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
     [[nodiscard]] std::expected<T*, error_code> get(std::size_t idx) {
-        if(idx >= firstAvailableEntry_) { return std::unexpected(error_code::IndexOutOfBounds); }
+        if(idx >= logical_size_) { return std::unexpected(error_code::IndexOutOfBounds); }
         return &data_[idx];
     }
 
     // We need one for const ps_vectors and one for non-const.
     template <typename ExecutionPolicy, typename F>
-        requires std::is_execution_policy_v<std::remove_cvref_t<ExecutionPolicy>> && std::is_invocable_v<F&, T&>
+    requires std::is_execution_policy_v<std::remove_cvref_t<ExecutionPolicy>> && std::is_invocable_v<F&, T&>
     void for_each(ExecutionPolicy&& policy, F&& aFunc) {
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
               data_.begin(),
-              data_.begin() + static_cast<std::ptrdiff_t>(firstAvailableEntry_),
+              data_.begin() + static_cast<std::ptrdiff_t>(logical_size_),
               [&aFunc](T& data) { aFunc(data); }
         );
     }
 
     // The const version
     template <typename ExecutionPolicy, typename F>
-        requires std::is_execution_policy_v<std::remove_cvref_t<ExecutionPolicy>> && std::is_invocable_v<F&, const T&>
+    requires std::is_execution_policy_v<std::remove_cvref_t<ExecutionPolicy>> && std::is_invocable_v<F&, const T&>
     void for_each(ExecutionPolicy&& policy, F&& aFunc) const {
         std::for_each(
              std::forward<ExecutionPolicy>(policy),
               data_.cbegin(),
-              data_.cbegin() + static_cast<std::ptrdiff_t>(firstAvailableEntry_),
+              data_.cbegin() + static_cast<std::ptrdiff_t>(logical_size_),
               [&aFunc](const T& data) { aFunc(data); }
         );
     }
