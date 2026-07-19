@@ -52,9 +52,10 @@ private:
             requires std::is_move_constructible_v<T>
             : nextFree(0)
             , generation(otherSlot.generation)
-            , active(otherSlot.active) {
+            , active(false) {
                 if(otherSlot.active) {
                     std::construct_at(std::addressof(value), std::move(otherSlot.value));
+                    active = true;
                 } else {
                     nextFree = otherSlot.nextFree;
                 }
