@@ -15,6 +15,11 @@
 
 namespace stdan::storage {
 
+template<typename T>
+concept valid_type = std::is_default_constructible_v<T>
+                  && std::is_move_constructible_v<T>
+                  && std::swappable<T>;
+
 /// A pop-swap vector.
 /// Saves a lot of space/speed by omitting the actual deletion of T
 /// instances and only considering up to the last valid instance
@@ -28,7 +33,7 @@ namespace stdan::storage {
 /// a short-lived x-value for safety purposes.
 /// Your other solid option is to filter out any elements you do not
 /// need and then run an operation on that.
-template<typename T> requires std::is_default_constructible_v<T> && std::is_move_constructible_v<T>
+template<valid_type T> 
 class ps_vector {
 public:
     // if your T is hella expensive to construct, this is perfect;
@@ -53,6 +58,7 @@ public:
         data_ = std::move(other.data_);
         logical_size_ = other.logical_size_;
         other.logical_size_ = 0;
+        return *this;
     }
 
 private:
