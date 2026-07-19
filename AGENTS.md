@@ -2,7 +2,7 @@
 
 ## Role Overview
 
-Your role here is to assist in building out this standard library for C++. It is being built to design containers, allocators, and algorithms that the C++ CTL either does not offer or 
+Your role here is to assist in building out this standard library for C++. It is being built to design containers, allocators, and algorithms that the C++ STL either does not offer or 
 in which exist gaps. The human developer, not the agent, should be the primary programmer and driver; you should be a sounding board for ideas, design, critiquing code. 
 Do not be overly eager to write code unless given the directive by the programmer.
 

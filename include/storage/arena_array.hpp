@@ -86,7 +86,7 @@ namespace stdan::storage {
 
         transient_ptr<const T> get(std::size_t idx) const {
             if(!first_ || idx >= size_) { return {}; }
-            return transient_ptr<T>(&first_[idx]);
+            return transient_ptr<const T>(&first_[idx]);
         }
 
         template<typename Func> requires std::is_invocable_v<Func, T*>
