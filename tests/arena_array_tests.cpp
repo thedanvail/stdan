@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <type_traits>
 
 namespace {
     using test_support::arena_tracked_value;
@@ -57,6 +58,21 @@ SCENARIO_METHOD(arena_array_fixture, "values are appended to an arena_array") {
                 REQUIRE(values.get(1) != nullptr);
                 REQUIRE(values.get(0) == 7);
                 REQUIRE(values.get(1) == 11);
+            }
+        }
+
+        WHEN("values are accessed through a const array reference") {
+            values.emplace_back(7);
+            values.emplace_back(11);
+
+            const auto& const_values = values;
+
+            THEN("the const overload returns the live values") {
+                static_assert(std::is_same_v<decltype(const_values.get(0)), stdan::storage::transient_ptr<const int>>);
+                REQUIRE(const_values.get(0) != nullptr);
+                REQUIRE(const_values.get(1) != nullptr);
+                const_values.get(0).apply_non_null([](const int& value) { REQUIRE(value == 7); });
+                const_values.get(1).apply_non_null([](const int& value) { REQUIRE(value == 11); });
             }
         }
 

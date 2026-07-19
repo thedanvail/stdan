@@ -38,8 +38,9 @@ make build
 ### On Windows (CMake + Visual Studio)
 
 ```sh
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Debug
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -DSTDAN_BUILD_TESTS=ON
+cmake --build build --config Debug --target stdan_tests
+ctest --test-dir build -C Debug --output-on-failure
 ```
 
 ## Tests
