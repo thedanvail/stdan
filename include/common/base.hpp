@@ -8,7 +8,7 @@
 #endif
 
 #ifndef STDAN_DEBUG
-    #define dassert(expr, message) ((void)0)
+    #define dassert(expr, ...) ((void)0)
 #else
 
 #include <cassert>
