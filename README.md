@@ -22,6 +22,12 @@ The repository is organized to grow over time. New implementations, tests, and s
 
 ## Build
 
+Make sure to grab vendored submodules:
+
+```sh
+git submodule update --init --recursive
+```
+
 ### With CMake
 
 ```sh
@@ -59,12 +65,6 @@ ctest --test-dir build --output-on-failure
 
 ```sh
 make test
-```
-
-If the test dependency is not present yet, initialize submodules first:
-
-```sh
-git submodule update --init --recursive
 ```
 
 ## Notes
