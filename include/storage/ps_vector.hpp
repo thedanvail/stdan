@@ -161,7 +161,7 @@ public:
                 stdan::format::format("idx = {}, upper bound = {}", idx, logical_size_)
         ); }
         try {
-            return transient_ptr<const T>::from(const_cast<const T>(data_.at(idx)));
+            return transient_ptr<const T>::from(data_.at(idx));
         } catch (...) { throw; }
     }
 
