@@ -2,13 +2,16 @@
 
 #include "common/base.hpp"
 #include "storage/storage_base.hpp"
+#include "storage/transient_ptr.hpp"
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <execution>
 #include <expected>
+#include <stdexcept>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -16,8 +19,7 @@
 namespace stdan::storage {
 
 template<typename T>
-concept valid_type = std::is_default_constructible_v<T>
-                  && std::is_move_constructible_v<T>
+concept valid_type = std::is_move_constructible_v<T>
                   && std::swappable<T>;
 
 /// A pop-swap vector.
@@ -121,15 +123,28 @@ public:
         --logical_size_;
     }
 
+    template<typename F> requires std::is_invocable_r_v<bool, F, T&>
+    void filter(F&& predicate) {
+        for(std::size_t idx = 0; idx < logical_size_; ++idx) {
+            if(!predicate(data_.at(idx))) {
+                remove(idx);
+            }
+        }
+    }
+
     /// Retrieves the const pointer for the element at the index.
     /// NOTE: Be careful about using this. It is heavily prone to misuse
     /// due to the fact that elements may pop/swap/be moved and the underlying
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
-    [[nodiscard]] std::expected<const T*, error_code> get(std::size_t idx) const {
-        if(idx >= logical_size_) { return std::unexpected(error_code::IndexOutOfBounds); }
-        return &data_[idx];
+    transient_ptr<T> get(std::size_t idx) {
+        if(idx >= logical_size_) { throw std::out_of_range(
+                stdan::format::format("idx = {}, upper bound = {}", idx, logical_size_)
+        ); }
+        try {
+            return transient_ptr<T>::from(data_.at(idx));
+        } catch (...) { throw; }
     }
 
     /// Retrieves the pointer to a mutable reference for the element at the index.
@@ -138,9 +153,13 @@ public:
     /// pointer will then become invalid. 
     /// In fact, unless you are 100% sure you know what you're doing (and you probably don't),
     /// don't use this. Prefer to edit the item in-place.
-    [[nodiscard]] std::expected<T*, error_code> get(std::size_t idx) {
-        if(idx >= logical_size_) { return std::unexpected(error_code::IndexOutOfBounds); }
-        return &data_[idx];
+    transient_ptr<const T> get(std::size_t idx) const {
+        if(idx >= logical_size_) { throw std::out_of_range(
+                stdan::format::format("idx = {}, upper bound = {}", idx, logical_size_)
+        ); }
+        try {
+            return transient_ptr<const T>::from(const_cast<const T>(data_.at(idx)));
+        } catch (...) { throw; }
     }
 
     // We need one for const ps_vectors and one for non-const.
