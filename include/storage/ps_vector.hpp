@@ -19,7 +19,8 @@
 namespace stdan::storage {
 
 template<typename T>
-concept valid_type = std::is_move_constructible_v<T>
+concept valid_type = std::is_default_constructible_v<T>
+                  && std::is_move_constructible_v<T>
                   && std::swappable<T>;
 
 /// A pop-swap vector.
@@ -125,9 +126,11 @@ public:
 
     template<typename F> requires std::is_invocable_r_v<bool, F, T&>
     void filter(F&& predicate) {
-        for(std::size_t idx = 0; idx < logical_size_; ++idx) {
+        for(std::size_t idx = 0; idx < logical_size_;) {
             if(!predicate(data_.at(idx))) {
                 remove(idx);
+            } else {
+                ++idx;
             }
         }
     }
