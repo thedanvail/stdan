@@ -31,7 +31,7 @@ public:
 
     ~transient_ptr() = default;
 
-    static transient_ptr<T> from(T t) { return transient_ptr<T>(std::addressof(t)); }
+    static transient_ptr<T> from(T& ref) noexcept { return transient_ptr<T>(ref); }
 
     explicit operator bool() const noexcept { return ptr_ != nullptr; }
     friend bool operator==(const transient_ptr& lhs, std::nullptr_t) noexcept { return lhs.ptr_ == nullptr; }
