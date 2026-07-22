@@ -15,9 +15,7 @@ using test_support::tracked_value;
 
 template<typename T>
 T& live_value_at(stdan::storage::ps_vector<T>& values, std::size_t index) {
-    auto value = values.get(index);
-    REQUIRE(value.has_value());
-    return *value.value();
+    return *values.get(index);
 }
 } // namespace
 
@@ -32,7 +30,7 @@ SCENARIO("resize preconstructs reusable storage without creating logical element
                 REQUIRE(values.empty());
                 REQUIRE(values.size() == 0);
                 REQUIRE(values.capacity() >= 4);
-                REQUIRE_FALSE(values.get(0).has_value());
+                REQUIRE_THROWS_AS(values.get(0), std::out_of_range);
             }
 
             THEN("appends reuse the preconstructed storage") {
@@ -51,7 +49,7 @@ SCENARIO("resize preconstructs reusable storage without creating logical element
             THEN("the allocation grows but the vector remains logically empty") {
                 REQUIRE(values.empty());
                 REQUIRE(values.capacity() >= 5);
-                REQUIRE_FALSE(values.get(0).has_value());
+                REQUIRE_THROWS_AS(values.get(0), std::out_of_range);
             }
         }
     }
@@ -71,7 +69,7 @@ SCENARIO("resize truncates logical elements when physical storage shrinks") {
                 REQUIRE(values.size() == 2);
                 REQUIRE(live_value_at(values, 0) == 7);
                 REQUIRE(live_value_at(values, 1) == 11);
-                REQUIRE_FALSE(values.get(2).has_value());
+                REQUIRE_THROWS_AS(values.get(2), std::out_of_range);
             }
         }
     }
@@ -131,7 +129,7 @@ SCENARIO("remove swaps the last live element into the removed slot") {
                 REQUIRE(values.size() == 2);
                 REQUIRE(live_value_at(values, 0) == 7);
                 REQUIRE(live_value_at(values, 1) == 13);
-                REQUIRE_FALSE(values.get(2).has_value());
+                REQUIRE_THROWS_AS(values.get(2), std::out_of_range);
             }
         }
 
@@ -194,7 +192,7 @@ SCENARIO("remove retains constructed backing objects for reuse") {
                 REQUIRE(tracked_value::live == live_before_remove);
                 REQUIRE(live_value_at(values, 0).value == 1);
                 REQUIRE(live_value_at(values, 1).value == 3);
-                REQUIRE_FALSE(values.get(2).has_value());
+                REQUIRE_THROWS_AS(values.get(2), std::out_of_range);
             }
 
             THEN("the inactive backing object is reused by a later append") {
