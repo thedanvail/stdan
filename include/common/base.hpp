@@ -18,6 +18,14 @@
 #include <iostream> // IWYU pragma: keep
 #include <utility>
 
+namespace stdan::format {
+
+template <typename... Args>
+std::string format(std::format_string<Args...> fmt, Args&&... args) {
+    return std::format(fmt, std::forward<Args>(args)...);
+}
+
+} // namespace stdan::format
 
 namespace stdan::assert {
 inline void assertFailed(
