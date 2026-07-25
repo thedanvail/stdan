@@ -30,9 +30,9 @@ namespace stdan::memory {
             return pool_ + get_offset(index, blockSize);
         }
 
-        void dealloc(void* aPtr) {
-            if(aPtr == nullptr) { return; }
-            std::size_t offset = static_cast<std::byte*>(aPtr) - pool_;
+        void dealloc(void* ptr) {
+            if(ptr == nullptr) { return; }
+            std::size_t offset = static_cast<std::byte*>(ptr) - pool_;
             std::size_t index = find_node_index(offset);
             if(index < NUM_NODES) { unmark_recursive(index); }
         }
@@ -49,16 +49,16 @@ namespace stdan::memory {
         std::size_t get_right_child(std::size_t i) { return i * 2 + 2; }
         std::size_t get_parent(std::size_t i) { return (i - 1) / 2; }
 
-        [[nodiscard]] std::size_t find_free_node(std::size_t index, std::size_t blockSize,
-                                                  std::size_t targetBlockSize) {
-            if(index >= NUM_NODES || tree_.test(index)) { return NUM_NODES; }
-            if(blockSize == targetBlockSize) { return index; }
+        [[nodiscard]] std::size_t find_free_node(std::size_t idx, std::size_t size,
+                                                  std::size_t target_size) {
+            if(idx >= NUM_NODES || tree_.test(idx)) { return NUM_NODES; }
+            if(size == target_size) { return idx; }
 
-            const std::size_t childBlockSize = blockSize / 2;
-            const std::size_t left = find_free_node(get_left_child(index), childBlockSize, targetBlockSize);
+            const std::size_t childBlockSize = size / 2;
+            const std::size_t left = find_free_node(get_left_child(idx), childBlockSize, target_size);
             return left != NUM_NODES
                 ? left
-                : find_free_node(get_right_child(index), childBlockSize, targetBlockSize);
+                : find_free_node(get_right_child(idx), childBlockSize, target_size);
         }
 
         void mark_recursive(std::size_t idx, bool val) {
@@ -73,12 +73,12 @@ namespace stdan::memory {
             mark_recursive(idx, false);
         }
 
-        void unmark_recursive(std::size_t aIndex) {
-            clear_subtree(aIndex);
+        void unmark_recursive(std::size_t idx) {
+            clear_subtree(idx);
 
-            if(aIndex == 0) { return; }
+            if(idx == 0) { return; }
 
-            std::size_t parent = get_parent(aIndex);
+            std::size_t parent = get_parent(idx);
             std::size_t left = get_left_child(parent);
             std::size_t right = get_right_child(parent);
 
@@ -89,27 +89,27 @@ namespace stdan::memory {
             }
         }
 
-        [[nodiscard]] std::size_t get_offset(std::size_t aIndex, std::size_t aBlockSize) const {
+        [[nodiscard]] std::size_t get_offset(std::size_t idx, std::size_t size) const {
             // level = log2(TotalSize / aBlockSize)
             std::size_t level = 0;
-            std::size_t ratio = TotalSize / aBlockSize;
+            std::size_t ratio = TotalSize / size;
             while (ratio >>= 1) {
                 ++level;
             }
 
             std::size_t firstIndexInLevel = (1ULL << level) - 1;
-            return (aIndex - firstIndexInLevel) * aBlockSize;
+            return (idx - firstIndexInLevel) * size;
         }
 
-        [[nodiscard]] std::size_t find_node_index(std::size_t aOffset) {
+        [[nodiscard]] std::size_t find_node_index(std::size_t offset) {
             // Walk down from the root following the offset, returning the
-            // first allocated node whose range starts at aOffset.
-            std::size_t index = 0;
+            // first allocated node whose range starts at `offset`.
+            std::size_t idx = 0;
             std::size_t blockSize = TotalSize;
 
-            while (index < NUM_NODES) {
-                if (tree_.test(index) && get_offset(index, blockSize) == aOffset) {
-                    return index;
+            while (idx < NUM_NODES) {
+                if (tree_.test(idx) && get_offset(idx, blockSize) == offset) {
+                    return idx;
                 }
 
                 blockSize /= 2;
@@ -118,12 +118,12 @@ namespace stdan::memory {
                 }
 
                 // Decide whether to descend left or right based on offset
-                std::size_t left = get_left_child(index);
-                if (aOffset < get_offset(left, blockSize) + blockSize) {
-                    index = left;
+                std::size_t left = get_left_child(idx);
+                if(offset < get_offset(left, blockSize) + blockSize) {
+                    idx = left;
                 }
                 else {
-                    index = get_right_child(index);
+                    idx = get_right_child(idx);
                 }
             }
 
@@ -131,5 +131,4 @@ namespace stdan::memory {
         }
 
     };
-
 } // namespace Memory
