@@ -22,6 +22,21 @@ template<typename T>
 const T& live_value_at(const stdan::storage::ps_vector<T>& values, std::size_t index) {
     return *values.get(index);
 }
+
+class throw_on_copy_guard {
+public:
+    explicit throw_on_copy_guard(bool enabled) noexcept
+        : previous_(throwing_copy_value::throw_on_copy) {
+        throwing_copy_value::throw_on_copy = enabled;
+    }
+
+    ~throw_on_copy_guard() noexcept {
+        throwing_copy_value::throw_on_copy = previous_;
+    }
+
+private:
+    bool previous_;
+};
 } // namespace
 
 SCENARIO("resize preconstructs reusable storage without creating logical elements") {
@@ -55,6 +70,27 @@ SCENARIO("resize preconstructs reusable storage without creating logical element
                 REQUIRE(values.empty());
                 REQUIRE(values.capacity() >= 5);
                 REQUIRE_THROWS_AS(values.get(0), std::out_of_range);
+            }
+        }
+    }
+}
+
+SCENARIO("const access observes only logical elements") {
+    GIVEN("a const view of a vector with logical elements") {
+        stdan::storage::ps_vector<int> values;
+        values.append(7);
+        values.append(11);
+        const stdan::storage::ps_vector<int>& const_values = values;
+
+        WHEN("const get and const for_each are used") {
+            int total = 0;
+            const_values.for_each([&total](const int& value) { total += value; });
+
+            THEN("both operations expose the logical range") {
+                REQUIRE(live_value_at(const_values, 0) == 7);
+                REQUIRE(live_value_at(const_values, 1) == 11);
+                REQUIRE(total == 18);
+                REQUIRE_THROWS_AS(const_values.get(2), std::out_of_range);
             }
         }
     }
@@ -282,14 +318,14 @@ SCENARIO("append propagates copy-assignment failures without changing logical si
         throwing_copy_value source{99};
 
         WHEN("copy assignment into the reusable slot throws") {
-            throwing_copy_value::throw_on_copy = true;
-
             THEN("the exception propagates and the logical range remains unchanged") {
-                REQUIRE_THROWS_AS(values.append(source), std::runtime_error);
-                REQUIRE(values.size() == 1);
-                REQUIRE(live_value_at(values, 0).value == 42);
+                {
+                    const throw_on_copy_guard guard{true};
+                    REQUIRE_THROWS_AS(values.append(source), std::runtime_error);
+                    REQUIRE(values.size() == 1);
+                    REQUIRE(live_value_at(values, 0).value == 42);
+                }
 
-                throwing_copy_value::throw_on_copy = false;
                 throwing_copy_value replacement{19};
                 REQUIRE_NOTHROW(values.append(replacement));
                 REQUIRE(values.size() == 2);

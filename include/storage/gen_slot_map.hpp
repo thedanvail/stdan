@@ -12,11 +12,11 @@
 #include <vector>
 
 namespace stdan::storage {
-inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
-
 template<typename T>
 class generational_slot_map {
 private:
+    static constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
+
     struct slot {
         union {
             T value;
@@ -55,6 +55,7 @@ private:
             , active(false) {
                 if(otherSlot.active) {
                     std::construct_at(std::addressof(value), std::move(otherSlot.value));
+                    // Keep the source active so it still destroys its moved-from value.
                     active = true;
                 } else {
                     nextFree = otherSlot.nextFree;

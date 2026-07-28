@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tmp_lists.hpp"
+#include "tree_nodes.hpp"
 
 namespace stdan::bfs {
 
@@ -33,7 +33,7 @@ public:
     >;
 };
 
-template<class Node>
+template<tree_nodes::tree_node Node>
 using bfs_order_t = typename bfs_order<tmp_types::type_list<Node>>::type;
 
 } // namespace stdan::bfs

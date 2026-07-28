@@ -39,7 +39,7 @@ public:
     // Take T by const reference: MSVC rejects by-value parameters whose
     // alignment exceeds what the calling convention can guarantee (C2719),
     // which shows up for over-aligned T such as alignas(8192).
-    friend bool operator==(const transient_ptr& lhs, const T& rhs) noexcept
+    friend bool operator==(const transient_ptr& lhs, const T& rhs) noexcept(noexcept(*lhs.ptr_ == rhs))
     requires std::equality_comparable<T> {
         if(lhs.ptr_ == nullptr) { return false; }
         return *lhs.ptr_ == rhs;

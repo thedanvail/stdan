@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tmp_lists.hpp"
+#include "tree_nodes.hpp"
 
 namespace stdan::dfs {
 
@@ -31,7 +31,7 @@ struct dfs_order {
     >;
 };
 
-template<class Node>
+template<tree_nodes::tree_node Node>
 using dfs_order_t = typename dfs_order<Node>::type;
 
 } // namespace stdan::dfs

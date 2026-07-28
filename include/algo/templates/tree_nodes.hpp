@@ -2,9 +2,18 @@
 
 #include "tmp_lists.hpp"
 
-// TODO: Documentation
-
 namespace stdan::tree_nodes {
+
+template<class T>
+inline constexpr bool is_type_list = false;
+
+template<class... Ts>
+inline constexpr bool is_type_list<tmp_types::type_list<Ts...>> = true;
+
+/// A tree node exposes its direct descendants as a `tmp_types::type_list`
+/// named `children`. Tree algorithms assume the resulting graph is acyclic.
+template<class Node>
+concept tree_node = requires { typename Node::children; } && is_type_list<typename Node::children>;
 
 template<int Value>
 struct leaf {
