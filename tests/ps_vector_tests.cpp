@@ -17,6 +17,11 @@ template<typename T>
 T& live_value_at(stdan::storage::ps_vector<T>& values, std::size_t index) {
     return *values.get(index);
 }
+
+template<typename T>
+const T& live_value_at(const stdan::storage::ps_vector<T>& values, std::size_t index) {
+    return *values.get(index);
+}
 } // namespace
 
 SCENARIO("resize preconstructs reusable storage without creating logical elements") {
