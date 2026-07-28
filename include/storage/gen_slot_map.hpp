@@ -12,11 +12,11 @@
 #include <vector>
 
 namespace stdan::storage {
+inline constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
+
 template<typename T>
 class generational_slot_map {
 private:
-    static constexpr std::uint32_t InvalidIndex = std::numeric_limits<std::uint32_t>::max();
-
     struct slot {
         union {
             T value;

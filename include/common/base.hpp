@@ -7,8 +7,15 @@
 #define STDAN_WIN
 #endif
 
+#ifndef STDAN_DEBUG
+    #define dassert(expr, ...) ((void)0)
+#else
+
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <format>
-#include <string>
+#include <iostream> // IWYU pragma: keep
 #include <utility>
 
 namespace stdan::format {
@@ -23,11 +30,6 @@ std::string format(std::format_string<Args...> fmt, Args&&... args) {
 #ifndef STDAN_DEBUG
     #define dassert(expr, ...) ((void)0)
 #else
-
-#include <cassert>
-#include <cstdio>
-#include <cstdlib>
-#include <iostream> // IWYU pragma: keep
 
 namespace stdan::assert {
 inline void assertFailed(

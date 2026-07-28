@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <execution>
@@ -51,12 +52,12 @@ public:
     ps_vector(const ps_vector& aOther)            = default;
     ps_vector& operator=(const ps_vector& aOther) = default;
 
-    ps_vector(ps_vector&& other) noexcept {
+    ps_vector(ps_vector&& other) {
         data_ = std::move(other.data_);
         logical_size_ = other.logical_size_;
         other.logical_size_ = 0;
     }
-    ps_vector& operator=(ps_vector&& other) noexcept {
+    ps_vector& operator=(ps_vector&& other) {
         if(this == &other) { return *this; }
         data_ = std::move(other.data_);
         logical_size_ = other.logical_size_;
@@ -67,12 +68,6 @@ public:
 private:
     std::vector<T> data_;
     std::size_t    logical_size_ = 0;
-
-    void grow_capacity() {
-        const std::size_t current = data_.capacity();
-        const std::size_t increase = std::max(current / 2, std::size_t{1});
-        data_.resize(current + increase);
-    }
 
 public:
 
@@ -103,7 +98,7 @@ public:
     }
 
     void append(T&& t) requires stdan::concepts::move_reusable<T> {
-        if(full()) [[unlikely]] { grow_capacity(); }
+        if(full()) [[unlikely]] { data_.resize(data_.size() * 1.5); }
 
         if (logical_size_ < data_.size()) [[likely]] { data_[logical_size_] = std::move(t); }
         else { data_.emplace_back(std::move(t)); }
@@ -111,7 +106,7 @@ public:
     }
 
     void append(const T& t) requires stdan::concepts::copy_reusable<T> {
-        if(full()) [[unlikely]] { grow_capacity(); }
+        if(full()) [[unlikely]] { data_.resize(data_.size() * 1.5); }
 
         if(logical_size_ < data_.size()) { data_[logical_size_] = t; }
         else { data_.emplace_back(t); }
@@ -132,7 +127,7 @@ public:
     template<typename F> requires std::is_invocable_r_v<bool, F, T&>
     void filter(F&& predicate) {
         for(std::size_t idx = 0; idx < logical_size_;) {
-            if(!predicate(data_[idx])) {
+            if(!predicate(data_.at(idx))) {
                 remove(idx);
             } else {
                 ++idx;
@@ -150,7 +145,9 @@ public:
         if(idx >= logical_size_) { throw std::out_of_range(
                 stdan::format::format("idx = {}, upper bound = {}", idx, logical_size_)
         ); }
-        return transient_ptr<T>::from(data_[idx]);
+        try {
+            return transient_ptr<T>::from(data_.at(idx));
+        } catch (...) { throw; }
     }
 
     /// Retrieves the pointer to a mutable reference for the element at the index.
@@ -163,7 +160,9 @@ public:
         if(idx >= logical_size_) { throw std::out_of_range(
                 stdan::format::format("idx = {}, upper bound = {}", idx, logical_size_)
         ); }
-        return transient_ptr<const T>::from(data_[idx]);
+        try {
+            return transient_ptr<const T>::from(data_.at(idx));
+        } catch (...) { throw; }
     }
 
     // We need one for const ps_vectors and one for non-const.
