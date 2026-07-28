@@ -74,5 +74,5 @@ make test
 - The project currently uses a static library build.
 
 ## Contributing
-See [CONTRIBUTING.md](CONTRIBUTING.md)
 
+See [CONTRIBUTING.md](CONTRIBUTING.md)

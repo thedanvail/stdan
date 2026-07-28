@@ -17,6 +17,26 @@ template<typename T>
 T& live_value_at(stdan::storage::ps_vector<T>& values, std::size_t index) {
     return *values.get(index);
 }
+
+template<typename T>
+const T& live_value_at(const stdan::storage::ps_vector<T>& values, std::size_t index) {
+    return *values.get(index);
+}
+
+class throw_on_copy_guard {
+public:
+    explicit throw_on_copy_guard(bool enabled) noexcept
+        : previous_(throwing_copy_value::throw_on_copy) {
+        throwing_copy_value::throw_on_copy = enabled;
+    }
+
+    ~throw_on_copy_guard() noexcept {
+        throwing_copy_value::throw_on_copy = previous_;
+    }
+
+private:
+    bool previous_;
+};
 } // namespace
 
 SCENARIO("resize preconstructs reusable storage without creating logical elements") {

@@ -55,6 +55,7 @@ private:
             , active(false) {
                 if(otherSlot.active) {
                     std::construct_at(std::addressof(value), std::move(otherSlot.value));
+                    // Keep the source active so it still destroys its moved-from value.
                     active = true;
                 } else {
                     nextFree = otherSlot.nextFree;
