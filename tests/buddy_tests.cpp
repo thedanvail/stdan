@@ -236,5 +236,11 @@ SCENARIO("a buddy allocator rejects unsupported alignment requests") {
         THEN("non-power-of-two alignment is rejected") {
             REQUIRE(allocator.alloc(8, 3) == nullptr);
         }
+
+        THEN("invalid allocation sizes and excessive alignment are rejected") {
+            REQUIRE(allocator.alloc(0, 1) == nullptr);
+            REQUIRE(allocator.alloc(65, 1) == nullptr);
+            REQUIRE(allocator.alloc(8, 128) == nullptr);
+        }
     }
 }
